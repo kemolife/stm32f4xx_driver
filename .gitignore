@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+# STM32CubeIDE regenerates everything under Debug/ and Release/ from .cproject,
+# including the makefiles. Nothing in there is source.
+Debug/
+Release/
+
+# Loose artifacts if you ever build outside the IDE
+*.o
+*.d
+*.su
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.a
+
+# ---------------------------------------------------------------------------
+# Eclipse / STM32CubeIDE workspace state
+# ---------------------------------------------------------------------------
+# Machine- and workspace-local preferences and the CDT scanner-discovery cache.
+# .cproject, .project and *.launch ARE tracked: without them the project will
+# not open in CubeIDE.
+.settings/
+.metadata/
+
+# ---------------------------------------------------------------------------
+# Debug / flashing
+# ---------------------------------------------------------------------------
+.gdbinit
+*.gdb
+openocd.log
+
+# ---------------------------------------------------------------------------
+# Editors
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store

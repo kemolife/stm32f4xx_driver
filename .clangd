@@ -1,0 +1,14 @@
+CompileFlags:
+  Add:
+    - -I/Users/vitaliiantoniuk/Documents/projects/embedded/STM32/stm32f4xx_driver/drivers/Inc
+    - -I/Users/vitaliiantoniuk/Documents/projects/embedded/STM32/stm32f4xx_driver/Inc
+    - -std=gnu11
+    - -DSTM32F446xx
+    - -Wno-unknown-attributes
+  Remove:
+    - -fcyclomatic-complexity
+    - -mcpu=*
+    - -mfpu=*
+    - -mfloat-abi=*
+    - -mthumb
+    - --specs=*
