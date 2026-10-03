@@ -43,7 +43,7 @@
 #define RX_RING_SIZE    64    // power of two, so the index wraps with a mask
 #define LINE_MAX        32
 
-UART_Handle_t uart2Handle;
+static UART_Handle_t uart2Handle;
 
 static uint8_t rx_byte;                           // target of each 1-byte ReceiveDataIT
 static volatile uint8_t rx_ring[RX_RING_SIZE];
@@ -58,7 +58,7 @@ static volatile uint32_t drop_count;              // ring buffer full
 
 static char tx_msg[128];
 
-void UART_GPIO_ConfigInit() {
+static void UART_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioUART;
 
 	memset(&gpioUART, 0, sizeof(GPIO_Handle_t));
@@ -79,7 +79,7 @@ void UART_GPIO_ConfigInit() {
 	GPIO_Init(&gpioUART);
 }
 
-void UART_ConfigInit() {
+static void UART_ConfigInit(void) {
 	memset(&uart2Handle, 0, sizeof(UART_Handle_t));
 
 	uart2Handle.Instance = USART2;
@@ -98,7 +98,7 @@ void UART_ConfigInit() {
 	UART_IRQInterruptConfig(IRQ_NO_USART2, ENABLE);
 }
 
-void GPIO_LedInit() {
+static void GPIO_LedInit(void) {
 	GPIO_Handle_t gpioLed;
 
 	memset(&gpioLed, 0, sizeof(GPIO_Handle_t));
@@ -190,7 +190,7 @@ static void run_command(const char *line) {
 	}
 }
 
-int main() {
+int main(void) {
 	char line[LINE_MAX + 1];
 	uint32_t line_len = 0;
 	uint8_t ch;

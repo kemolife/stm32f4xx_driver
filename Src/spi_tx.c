@@ -3,11 +3,14 @@
  *
  *  Created on: 9 Sept 2026
  *      Author: vitaliiantoniuk
+ *
+ * SPI2 master, software NSS. Sends "HELLO" once after reset on
+ * PB15 (MOSI) / PB13 (SCK). Watch it with a logic analyzer.
  */
-#include "string.h"
+#include <string.h>
 #include "stm32f446xx.h"
 
-void SPI_GPIO_ConfigInit() {
+static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
 
 	memset(&gpioSPI, 0, sizeof(GPIO_Handle_t));
@@ -30,14 +33,14 @@ void SPI_GPIO_ConfigInit() {
 	GPIO_Init(&gpioSPI);
 }
 
-void SPI_ConfigInit() {
+static void SPI_ConfigInit(void) {
 	SPI_Handle_t SPI_Handle;
 
 	memset(&SPI_Handle, 0, sizeof(SPI_Handle_t));
 
 	SPI_Handle.Instance = SPI2;
 	SPI_Handle.Config.DeviceMode = SPI_DEVICE_MODE_MASTER;
-	SPI_Handle.Config.BusConfig = SPI_BUS_CONFIG_SIMPLEX_RXONLY;
+	SPI_Handle.Config.BusConfig = SPI_BUS_CONFIG_FULL_DUPLEX;   // RXONLY would never transmit
 	SPI_Handle.Config.DFF = SPI_DFF_8BITS;
 	SPI_Handle.Config.SclkSpeed = SPI_SCLK_SPEED_DIV8;
 	SPI_Handle.Config.CPHA = SPI_CPHA_LOW;
@@ -48,7 +51,7 @@ void SPI_ConfigInit() {
 	SPI_Init(&SPI_Handle);
 }
 
-int main() {
+int main(void) {
 	SPI_GPIO_ConfigInit();
 	SPI_ConfigInit();
 
@@ -56,6 +59,9 @@ int main() {
 
 	uint8_t message[] = "HELLO";
 	SPI_SendData(SPI2, message, strlen((char*)message));
+
+	// SendData returns when the last byte is queued; wait until it is on the wire
+	while (SPI_IsBusy(SPI2));
 
 	SPI_PeripheralControl(SPI2, DISABLE);
 

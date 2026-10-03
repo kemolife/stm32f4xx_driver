@@ -240,14 +240,16 @@ uint16_t GPIO_ReadFromInputPort(GPIO_RegDef_t *pGPIOx){
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - uses BSRR: one write changes only this pin, so an interrupt that
+ *                       writes another pin of the same port at the same moment cannot
+ *                       undo this change (an ODR read-modify-write could)
  *
  ******************************************************************************************/
 void GPIO_WriteToOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber, uint8_t Value){
 	if (Value == GPIO_PIN_SET) {
-		pGPIOx->ODR |= (1 << PinNumber);
-	}else {
-		pGPIOx->ODR &= ~(1 << PinNumber);
+		pGPIOx->BSRR = (1U << PinNumber);            // BS[15:0]: set
+	} else {
+		pGPIOx->BSRR = (1U << (PinNumber + 16U));    // BR[31:16]: reset
 	}
 }
 
@@ -278,11 +280,18 @@ void GPIO_WriteToOutputPort(GPIO_RegDef_t *pGPIOx, uint16_t Value){
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - reads ODR, then writes BSRR once. Other pins of the port are never
+ *                       written, so a concurrent change to them is not lost
  *
  ******************************************************************************************/
 void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber){
-	pGPIOx->ODR ^= (1 << PinNumber);
+	uint32_t pin = (1U << PinNumber);
+
+	if (pGPIOx->ODR & pin) {
+		pGPIOx->BSRR = (pin << 16U);   // currently high: reset
+	} else {
+		pGPIOx->BSRR = pin;            // currently low: set
+	}
 }
 
 /******************************************************************************************

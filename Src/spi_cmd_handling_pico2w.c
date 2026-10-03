@@ -1,11 +1,12 @@
 /*
- * spi_tx.c
+ * spi_cmd_handling_pico2w.c
  *
  *  Created on: 9 Sept 2026
  *      Author: vitaliiantoniuk
  *
- * SPI2 master. On each button press, sends a length byte followed by an
- * ASCII payload to a Raspberry Pi Pico 2 W running as an SPI slave.
+ * SPI2 master. On each press of B1 (PC13), sends one command byte
+ * (CURRENT_COMMAND) to a Raspberry Pi Pico 2 W running as an SPI slave, then
+ * clocks out dummy bytes to read the answer: a length byte and the payload.
  *
  * Two settings here are not obvious and were established by measurement,
  * not by datasheet reading. Both must hold or the link fails:
@@ -23,7 +24,7 @@
  * permanently and the slave still receives multi-byte bursts. Manual CS
  * pulsing was needed only as a workaround while CPHA was still wrong.
  */
-#include "string.h"
+#include <string.h>
 #include "stm32f446xx.h"
 
 // ==========================================
@@ -39,11 +40,11 @@
 // Active command used in the loop (Swap this to try different commands!)
 #define CURRENT_COMMAND   CMD_GET_HELLO
 
-void delay() {
-	for (uint32_t i = 0; i < 500000; i++);
+static void delay(void) {
+	for (volatile uint32_t i = 0; i < 500000; i++);
 }
 
-void SPI_GPIO_ConfigInit() {
+static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
 
 	memset(&gpioSPI, 0, sizeof(GPIO_Handle_t));
@@ -74,7 +75,7 @@ void SPI_GPIO_ConfigInit() {
 	GPIO_Init(&gpioSPI);
 }
 
-void SPI_ConfigInit() {
+static void SPI_ConfigInit(void) {
 	SPI_Handle_t SPI_Handle;
 
 	memset(&SPI_Handle, 0, sizeof(SPI_Handle_t));
@@ -93,7 +94,7 @@ void SPI_ConfigInit() {
 	SPI_Init(&SPI_Handle);
 }
 
-void GPIO_ButtonInit() {
+static void GPIO_ButtonInit(void) {
 	GPIO_Handle_t gpioButton;
 
 	memset(&gpioButton, 0, sizeof(GPIO_Handle_t));
@@ -109,7 +110,7 @@ void GPIO_ButtonInit() {
 }
 
 // Helper function to send a command and instantly read a response byte
-uint8_t SPI_TransferByte(SPI_RegDef_t *pSPIx, uint8_t transmitByte) {
+static uint8_t SPI_TransferByte(SPI_RegDef_t *pSPIx, uint8_t transmitByte) {
     uint8_t receiveByte = 0;
 
     // Call your custom library API for single-byte exchange, or direct registers:
@@ -119,7 +120,7 @@ uint8_t SPI_TransferByte(SPI_RegDef_t *pSPIx, uint8_t transmitByte) {
     return receiveByte;
 }
 
-int main() {
+int main(void) {
 	SPI_GPIO_ConfigInit();
 	SPI_ConfigInit();
 	GPIO_ButtonInit();

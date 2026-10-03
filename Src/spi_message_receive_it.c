@@ -59,7 +59,7 @@ int _write(int file, char *ptr, int len) {
 
 /* ---------- shared state ------------------------------------------------- */
 
-SPI_Handle_t SPI2Handle;
+static SPI_Handle_t SPI2Handle;
 
 static volatile uint8_t attn_pending = 0;   // set by EXTI, cleared by main
 static volatile uint8_t rx_complete  = 0;   // set by the SPI RX-done callback
@@ -70,7 +70,7 @@ static uint8_t txDummy[MAX_MSG_LEN];
 
 /* ---------- init --------------------------------------------------------- */
 
-void SPI_GPIO_ConfigInit() {
+static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
 
 	memset(&gpioSPI, 0, sizeof(GPIO_Handle_t));
@@ -97,7 +97,7 @@ void SPI_GPIO_ConfigInit() {
 	GPIO_Init(&gpioSPI);
 }
 
-void SPI_ConfigInit() {
+static void SPI_ConfigInit(void) {
 	memset(&SPI2Handle, 0, sizeof(SPI_Handle_t));
 
 	SPI2Handle.Instance = SPI2;
@@ -118,7 +118,7 @@ void SPI_ConfigInit() {
 	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
 }
 
-void GPIO_AttnInit() {
+static void GPIO_AttnInit(void) {
 	GPIO_Handle_t gpioAttn;
 
 	memset(&gpioAttn, 0, sizeof(GPIO_Handle_t));
@@ -199,7 +199,7 @@ static void SPI_ReceiveMessage(void) {
 	printf("[SPI] %u bytes: \"%s\"\n", (unsigned)len, rxBuffer);
 }
 
-int main() {
+int main(void) {
 	SPI_GPIO_ConfigInit();
 	SPI_ConfigInit();
 	GPIO_AttnInit();

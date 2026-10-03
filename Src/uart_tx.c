@@ -27,13 +27,13 @@
 
 #define BUTTON_PIN      13   // B1 on PC13, active low
 
-UART_Handle_t uart2Handle;
+static UART_Handle_t uart2Handle;
 
-void delay() {
+static void delay(void) {
 	for (volatile uint32_t i = 0; i < 500000; i++);
 }
 
-void UART_GPIO_ConfigInit() {
+static void UART_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioUART;
 
 	memset(&gpioUART, 0, sizeof(GPIO_Handle_t));
@@ -56,7 +56,7 @@ void UART_GPIO_ConfigInit() {
 	GPIO_Init(&gpioUART);
 }
 
-void UART_ConfigInit() {
+static void UART_ConfigInit(void) {
 	memset(&uart2Handle, 0, sizeof(UART_Handle_t));
 
 	uart2Handle.Instance = USART2;
@@ -72,7 +72,7 @@ void UART_ConfigInit() {
 	UART_Init(&uart2Handle);
 }
 
-void GPIO_ButtonInit() {
+static void GPIO_ButtonInit(void) {
 	GPIO_Handle_t gpioButton;
 
 	memset(&gpioButton, 0, sizeof(GPIO_Handle_t));
@@ -87,7 +87,7 @@ void GPIO_ButtonInit() {
 	GPIO_Init(&gpioButton);
 }
 
-int main() {
+int main(void) {
 	char message[64];
 	uint32_t count = 0;
 

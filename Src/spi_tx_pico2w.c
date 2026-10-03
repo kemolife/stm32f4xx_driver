@@ -23,14 +23,14 @@
  * permanently and the slave still receives multi-byte bursts. Manual CS
  * pulsing was needed only as a workaround while CPHA was still wrong.
  */
-#include "string.h"
+#include <string.h>
 #include "stm32f446xx.h"
 
-void delay() {
-	for (uint32_t i = 0; i < 500000; i++);
+static void delay(void) {
+	for (volatile uint32_t i = 0; i < 500000; i++);
 }
 
-void SPI_GPIO_ConfigInit() {
+static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
 
 	memset(&gpioSPI, 0, sizeof(GPIO_Handle_t));
@@ -57,7 +57,7 @@ void SPI_GPIO_ConfigInit() {
 	GPIO_Init(&gpioSPI);
 }
 
-void SPI_ConfigInit() {
+static void SPI_ConfigInit(void) {
 	SPI_Handle_t SPI_Handle;
 
 	memset(&SPI_Handle, 0, sizeof(SPI_Handle_t));
@@ -76,7 +76,7 @@ void SPI_ConfigInit() {
 	SPI_Init(&SPI_Handle);
 }
 
-void GPIO_ButtonInit() {
+static void GPIO_ButtonInit(void) {
 	GPIO_Handle_t gpioButton;
 
 	memset(&gpioButton, 0, sizeof(GPIO_Handle_t));
@@ -91,7 +91,7 @@ void GPIO_ButtonInit() {
 	GPIO_Init(&gpioButton);
 }
 
-int main() {
+int main(void) {
 	SPI_GPIO_ConfigInit();
 	SPI_ConfigInit();
 	GPIO_ButtonInit();
