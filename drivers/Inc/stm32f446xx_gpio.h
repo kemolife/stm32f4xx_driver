@@ -17,7 +17,7 @@ typedef struct {
     uint8_t Mode;                 /*!< possible value from @GPIO_PIN_MODES >        */
     uint8_t Speed;                /*!< possible value from @GPIO_PIN_OUTPUT_SPEED > */
     uint8_t PuPdControl;          /*!< possible value from @GPIO_PIN_PUPD > */
-    uint8_t OPType;               /*!< possible value from @GPIO_PIN_OUTPUT_PYPES > */
+    uint8_t OPType;               /*!< possible value from @GPIO_PIN_OUTPUT_TYPES > */
     uint8_t AltFunMode;           /* Alternate function selection (AF0 to AF15)     */
 } GPIO_PinConfig_t;
 
@@ -39,7 +39,7 @@ typedef struct {
 #define GPIO_MODE_IT_RFT  6
 
 /*
- * @GPIO_PIN_OUTPUT_PYPES
+ * @GPIO_PIN_OUTPUT_TYPES
  * GPIO pin possible output types
  */
 #define GPIO_OP_TYPE_PP   0

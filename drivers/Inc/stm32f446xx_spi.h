@@ -1,5 +1,5 @@
 /*
- * stm32f446xx_gpio.h
+ * stm32f446xx_spi.h
  *
  *  Created on: 5 Sept 2026
  *  Author: vitaliiantoniuk
@@ -10,7 +10,7 @@
 #include "stm32f446xx.h"
 
 /**
- * @brief GPIO Pin Configuration structure definition
+ * @brief SPI Peripheral Configuration structure definition
  */
 typedef struct {
     uint8_t DeviceMode;           /* Master or Slave configuration (@SPI_DeviceMode)     */
@@ -183,12 +183,30 @@ void SPI_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority);
  */
 void SPI_IRQHandling(SPI_Handle_t *pSPIHandle);
 
+/**
+ * @brief  Enables or disables the SPI peripheral (CR1 SPE bit)
+ * @param  pSPIx: Base address of the SPI peripheral
+ * @param  EnorDi: ENABLE or DISABLE macros
+ */
 void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi);
 
+/**
+ * @brief  Reports whether the SPI is still shifting a frame
+ * @param  pSPIx: Base address of the SPI peripheral
+ * @return 1 while busy, 0 when idle
+ */
 int SPI_IsBusy(SPI_RegDef_t *pSPIx);
 
+/**
+ * @brief  Starts an interrupt driven transmission
+ * @return State before the call. SPI_READY means the transfer was accepted
+ */
 uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len);
 
+/**
+ * @brief  Starts an interrupt driven reception
+ * @return State before the call. SPI_READY means the transfer was accepted
+ */
 uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len);
 
 /**

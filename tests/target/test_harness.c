@@ -240,7 +240,7 @@ uint8_t test_nvic_priority(uint8_t irq) {
 void test_nvic_disable_all_used(void) {
 	/* Disable and un-pend every external IRQ so one suite cannot leak an
 	 * interrupt into the next one */
-	for (uint32_t i = 0; i < 3U; i++) {
+	for (uint32_t i = 0; i < 4U; i++) {   /* 4 registers cover IRQ 0 .. 96 */
 		NVIC_ICER_BASE[i] = 0xFFFFFFFFU;
 		NVIC_ICPR_BASE[i] = 0xFFFFFFFFU;
 	}

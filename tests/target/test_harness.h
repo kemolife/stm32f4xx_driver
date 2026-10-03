@@ -93,6 +93,7 @@ void test_led_toggle(void);
 /* ========================================================================== */
 
 void test_suite_rcc(void);
+void test_suite_nvic(void);
 void test_suite_gpio(void);
 void test_suite_spi(void);
 void test_suite_i2c(void);

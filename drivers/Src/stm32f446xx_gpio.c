@@ -1,5 +1,5 @@
 /*
- * stm32f446xx.c
+ * stm32f446xx_gpio.c
  *
  *  Created on: 5 Sept 2026
  *      Author: vitaliiantoniuk
@@ -69,7 +69,9 @@ void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, uint8_t EnorDi){
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - interrupt modes (GPIO_MODE_IT_*) also configure the pin as input,
+ *                       route the pin to its EXTI line and unmask the line. The NVIC
+ *                       line still has to be enabled with GPIO_IRQInterruptConfig
  *
  ******************************************************************************************/
 void GPIO_Init(GPIO_Handle_t *pGPIOHandle){
@@ -86,6 +88,11 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle){
 	}
 	else
 	{
+		// Interrupt modes: the pin must be an input (MODER = 00). Without this a
+		// pin that was an output before stays an output, and the EXTI line would
+		// only ever see the level we drive ourselves.
+		pGPIOHandle->Instance->MODER &= ~(0x3 << (2 * pin_num));
+
 		if (pGPIOHandle->Config.Mode == GPIO_MODE_IT_FT) {
 			EXTI->FTSR |= (1U << pin_num);
 			EXTI->RTSR &= ~(1U << pin_num);
@@ -100,7 +107,7 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle){
 		// configure system configuration controller
 		temp = pin_num / 4;
 		uint8_t pos = pin_num % 4;
-		uint8_t portcode;
+		uint8_t portcode = 0;
 		if (pGPIOHandle->Instance == GPIOA) {
 			portcode = 0x0;
 		} else if (pGPIOHandle->Instance == GPIOB) {
@@ -281,87 +288,35 @@ void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber){
 /******************************************************************************************
  * @fn                 - GPIO_IRQInterruptConfig
  *
- * @brief              - Enables or disables the interrupt processing for a given IRQ number in NVIC
+ * @brief              - Enables or disables the GPIO interrupt line in the NVIC
  *
- * @param[in]          - IRQ number to configure
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
  * @param[in]          - ENABLE or DISABLE macros
  *
  * @return             - none
  *
- * @Note               - Configures the ARM Cortex-M4 NVIC registers
+ * @Note               - same as NVIC_IRQInterruptConfig, kept so the GPIO API is complete
  *
  ******************************************************************************************/
-void GPIO_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi)
-{
-    if (EnorDi == ENABLE)
-    {
-        if (IRQNumber < 32)
-        {
-            NVIC_ISER0 = (1U << IRQNumber);
-        }
-        else if (IRQNumber < 64)
-        {
-            NVIC_ISER1 = (1U << (IRQNumber - 32));
-        }
-        else if (IRQNumber < 96)
-        {
-            NVIC_ISER2 = (1U << (IRQNumber - 64));
-        }
-    }
-    else // DISABLE
-    {
-        if (IRQNumber < 32)
-        {
-            NVIC_ICER0 = (1U << IRQNumber);
-        }
-        else if (IRQNumber < 64)
-        {
-            NVIC_ICER1 = (1U << (IRQNumber - 32));
-        }
-        else if (IRQNumber < 96)
-        {
-            NVIC_ICER2 = (1U << (IRQNumber - 64));
-        }
-    }
+void GPIO_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
+	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
 }
 
 /******************************************************************************************
  * @fn                 - GPIO_IRQPriorityConfig
  *
- * @brief              - Configures the priority level of a given IRQ number in the NVIC
+ * @brief              - Sets the priority of the GPIO interrupt line
  *
- * @param[in]          - IRQ number to configure
- * @param[in]          - priority level value
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
+ * @param[in]          - priority 0 (most urgent) .. 15 (least urgent)
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - same as NVIC_IRQPriorityConfig, kept so the GPIO API is complete
  *
  ******************************************************************************************/
-void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority)
-{
-    // Each IPR register handles 4 IRQs (8 bits per IRQ slot).
-    // Cortex-M4 only uses the upper 4 bits of the 8-bit priority field.
-    uint8_t shift_amount = ((IRQNumber % 4) * 8) + 4;
-
-    if (IRQNumber < 4) {
-        NVIC_IPR0 &= ~(0xF0U << ((IRQNumber % 4) * 8)); // Clear old priority MSBs
-        NVIC_IPR0 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber < 8) {
-        NVIC_IPR1 &= ~(0xF0U << ((IRQNumber % 4) * 8));
-        NVIC_IPR1 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber < 12) {
-        NVIC_IPR2 &= ~(0xF0U << ((IRQNumber % 4) * 8));
-        NVIC_IPR2 |= ((uint32_t)IRQPriority << shift_amount);
-    }
-    // Target shared EXTI vector lines directly for optimization
-    else if (IRQNumber == 23) { // EXTI9_5_IRQn
-        NVIC_IPR5 &= ~(0xF0U << ((23 % 4) * 8));
-        NVIC_IPR5 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber == 40) { // EXTI15_10_IRQn
-        NVIC_IPR10 &= ~(0xF0U << ((40 % 4) * 8));
-        NVIC_IPR10 |= ((uint32_t)IRQPriority << shift_amount);
-    }
+void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
+	NVIC_IRQPriorityConfig(IRQNumber, IRQPriority);
 }
 
 /******************************************************************************************

@@ -16,8 +16,8 @@
  ******************************************************************************
  */
 
-#import "string.h";
-#import "stm32f446xx.h"
+#include <string.h>
+#include "stm32f446xx.h"
 
 void delay() {
 	for (volatile uint32_t i = 0; i < 500000/2; i++);

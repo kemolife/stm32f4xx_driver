@@ -60,26 +60,15 @@
 #define SYSCFG_BASE           (APB2_BASE + 0x3800U)
 #define NVIC_BASE_ADDR        0xE000E100U
 
-/* 1. Interrupt Set-Enable Registers (Write 1 to Enable Interrupt) */
-#define NVIC_ISER0              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x000UL))
-#define NVIC_ISER1              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x004UL))
-#define NVIC_ISER2              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x008UL))
-
-/* 2. Interrupt Clear-Enable Registers (Write 1 to Disable Interrupt) */
-#define NVIC_ICER0              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x080UL))
-#define NVIC_ICER1              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x084UL))
-#define NVIC_ICER2              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x088UL))
-
-/* 3. Interrupt Priority Registers (4 IRQs per register, 8-bits per IRQ slot) */
-#define NVIC_IPR0               (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x300UL)) /* IRQ 0 to 3   */
-#define NVIC_IPR1               (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x304UL)) /* IRQ 4 to 7   */
-#define NVIC_IPR2               (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x308UL)) /* IRQ 8 to 11  */
-#define NVIC_IPR5               (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x314UL)) /* IRQ 20 to 23 (EXTI9_5 is 23) */
-#define NVIC_IPR10              (*(volatile uint32_t*)(NVIC_BASE_ADDR + 0x328UL)) /* IRQ 40 to 43 (EXTI15_10 is 40) */
-
-/* Generic view of the same priority block: index it by (IRQNumber / 4) to reach
- * any IRQ instead of adding a named macro per register. Needed by I2C, whose
- * IRQ numbers (31..34, 72, 73) fall outside the named macros above. */
+/*
+ * NVIC register blocks, used as arrays. Use the functions in
+ * stm32f446xx_nvic.h instead of touching these directly.
+ *   ISER[n] - Set-Enable:   bit k enables   IRQ (32 * n + k), write 1 to act
+ *   ICER[n] - Clear-Enable: bit k disables  IRQ (32 * n + k), write 1 to act
+ *   IPR[n]  - Priority:     byte k holds the priority of IRQ (4 * n + k)
+ */
+#define NVIC_ISER_BASE_ADDR     ((volatile uint32_t*)(NVIC_BASE_ADDR + 0x000UL))
+#define NVIC_ICER_BASE_ADDR     ((volatile uint32_t*)(NVIC_BASE_ADDR + 0x080UL))
 #define NVIC_PR_BASE_ADDR       ((volatile uint32_t*)(NVIC_BASE_ADDR + 0x300UL))
 
 /* The Cortex-M4 in this part implements only the upper 4 bits of each 8-bit
@@ -561,6 +550,7 @@ typedef struct {
 #define NVIC_IRQ_PRI15      15U /* Absolute Lowest Priority */
 
 #include "stm32f446xx_rcc.h"
+#include "stm32f446xx_nvic.h"
 #include "stm32f446xx_gpio.h"
 #include "stm32f446xx_spi.h"
 #include "stm32f446xx_i2c.h"

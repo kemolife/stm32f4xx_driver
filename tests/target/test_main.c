@@ -12,8 +12,9 @@
  *    - g_test_summary in Live Expressions (current_test shows where a hang is)
  *    - LD2: steady ON = all passed (skips allowed), blinking = something failed
  *
- *  Order matters: RCC first (everything uses its clock values), then GPIO
- *  (every loopback suite uses GPIO_Init for its pins), then the bus drivers.
+ *  Order matters: RCC first (everything uses its clock values), NVIC next
+ *  (every driver's IRQ config calls it), then GPIO (every loopback suite uses
+ *  GPIO_Init for its pins), then the bus drivers.
  */
 
 #include "test_harness.h"
@@ -25,6 +26,9 @@ int main(void) {
 	printf("\n##### STM32F446 driver tests #####\n");
 
 	test_suite_rcc();
+	test_nvic_disable_all_used();
+
+	test_suite_nvic();
 	test_nvic_disable_all_used();
 
 	test_suite_gpio();

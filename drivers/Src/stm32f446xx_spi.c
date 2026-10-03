@@ -1,5 +1,5 @@
 /*
- * stm32f446xx.c
+ * stm32f446xx_spi.c
  *
  *  Created on: 5 Sept 2026
  *      Author: vitaliiantoniuk
@@ -58,72 +58,97 @@ void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi) {
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - writes the whole CR1, so call it while SPE is 0, before
+ *                       SPI_PeripheralControl(..., ENABLE). The clock must already be on
  *
  ******************************************************************************************/
 void SPI_Init(SPI_Handle_t *pSPIHandle){
 	uint32_t temp = 0;
 
-	// 1. Configure device mode MSTR (Master selection - Bit 2)
-	temp |= (pSPIHandle->Config.DeviceMode & 0x01) << 2;
+	// 1. Configure device mode (MSTR)
+	temp |= (uint32_t)(pSPIHandle->Config.DeviceMode & 0x01) << SPI_CR1_MSTR;
 
-	// configure bus BIDIMODE
-	if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_FULL_DUPLEX) {
-		// BIDIMODE must be clear (0: 2-line unidirectional data mode selected)
-		temp &= ~(1 << 15);
-		temp &= ~(1 << 10);
-	}else if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_HALF_DUPLEX) {
-		// BIDIMODE must be set (1-line bidirectional data mode selected)
-		temp |= (1 << 15);
-		temp &= ~(1 << 10);
-	}else if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_SIMPLEX_RXONLY) {
-		// BIDIMODE must be clear (0: 2-line unidirectional data mode selected)
-		temp &= ~(1 << 15);
-		// set RXONLY (Receive only mode enable)
-		temp |= (1 << 10);
+	// 2. Configure the bus (BIDIMODE, RXONLY). temp starts at 0, so only the
+	//    bits that must be 1 are set here.
+	if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_HALF_DUPLEX) {
+		// 1-line bidirectional data mode
+		temp |= (1U << SPI_CR1_BIDIMODE);
+	} else if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_SIMPLEX_RXONLY) {
+		// 2-line unidirectional mode with the transmitter off
+		temp |= (1U << SPI_CR1_RXONLY);
 	}
+	// SPI_BUS_CONFIG_FULL_DUPLEX: BIDIMODE = 0, RXONLY = 0
 
-	// 3. Configure SclkSpeed (BR[2:0] - Bits 5:3)
-	temp |= (pSPIHandle->Config.SclkSpeed & 0x07) << 3;
+	// 3. Configure SclkSpeed (BR[2:0])
+	temp |= (uint32_t)(pSPIHandle->Config.SclkSpeed & 0x07) << SPI_CR1_BR;
 
-	// 4. Configure DFF (Data frame format - Bit 11)
-	temp |= (pSPIHandle->Config.DFF & 0x01) << 11;
+	// 4. Configure DFF (data frame format, 8 or 16 bit)
+	temp |= (uint32_t)(pSPIHandle->Config.DFF & 0x01) << SPI_CR1_DFF;
 
-	// 5. Configure CPOL (Clock polarity - Bit 1)
-	temp |= (pSPIHandle->Config.CPOL & 0x01) << 1;
+	// 5. Configure CPOL (clock polarity)
+	temp |= (uint32_t)(pSPIHandle->Config.CPOL & 0x01) << SPI_CR1_CPOL;
 
-	// 6. Configure CPHA (Clock phase - Bit 0)
-	temp |= (pSPIHandle->Config.CPHA & 0x01) << 0;
+	// 6. Configure CPHA (clock phase)
+	temp |= (uint32_t)(pSPIHandle->Config.CPHA & 0x01) << SPI_CR1_CPHA;
 
-	// 7. Configure SSM (Software Slave Management - Bit 9)
-	temp |= (pSPIHandle->Config.SSM & 0x01) << SPI_CR1_SSM;
+	// 7. Configure SSM (software slave management)
+	temp |= (uint32_t)(pSPIHandle->Config.SSM & 0x01) << SPI_CR1_SSM;
 
 	// 8. With SSM enabled the NSS level is driven by SSI. In master mode SSI must
 	//    be held high, otherwise NSS reads low and the hardware raises a mode
 	//    fault (MODF), which clears MSTR and SPE.
 	if (pSPIHandle->Config.SSM == SPI_SSM_EN &&
 	    pSPIHandle->Config.DeviceMode == SPI_DEVICE_MODE_MASTER) {
-		temp |= (1 << SPI_CR1_SSI);
+		temp |= (1U << SPI_CR1_SSI);
 	}
 
 	pSPIHandle->Instance->CR1 = temp;
 
+	// 9. Hardware NSS in master mode: SSOE lets the master drive NSS low,
+	//    otherwise NSS floats and the hardware raises a mode fault (MODF).
 	if (pSPIHandle->Config.SSM == SPI_SSM_DI &&
 		pSPIHandle->Config.DeviceMode == SPI_DEVICE_MODE_MASTER) {
-		pSPIHandle->Instance->CR2 |= (1 << SPI_CR2_SSOE);
+		pSPIHandle->Instance->CR2 |= (1U << SPI_CR2_SSOE);
 	}
 }
 
+/******************************************************************************************
+ * @fn                 - SPI_PeripheralControl
+ *
+ * @brief              - Enables or disables the SPI peripheral (CR1 SPE bit)
+ *
+ * @param[in]          - base address of the SPI peripheral
+ * @param[in]          - ENABLE or DISABLE macros
+ *
+ * @return             - none
+ *
+ * @Note               - call this after SPI_Init. Before disabling, wait until
+ *                       SPI_IsBusy() returns 0, or the last frame is cut
+ *
+ ******************************************************************************************/
 void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi) {
 	if (EnorDi == ENABLE) {
-		pSPIx->CR1 |= (1 << 6);
+		pSPIx->CR1 |= (1U << SPI_CR1_SPE);
 	} else {
-		pSPIx->CR1 &= ~(1 << 6);
+		pSPIx->CR1 &= ~(1U << SPI_CR1_SPE);
 	}
 }
 
+/******************************************************************************************
+ * @fn                 - SPI_IsBusy
+ *
+ * @brief              - Reports whether the SPI is still shifting a frame
+ *
+ * @param[in]          - base address of the SPI peripheral
+ *
+ * @return             - 1 while BSY is set, 0 when idle
+ *
+ * @Note               - after the last SPI_SendData, wait for 0 before disabling the
+ *                       peripheral or releasing chip select
+ *
+ ******************************************************************************************/
 int SPI_IsBusy(SPI_RegDef_t *pSPIx) {
-	return (pSPIx->SR >> SPI_SR_BSY) & 1;
+	return (pSPIx->SR >> SPI_SR_BSY) & 1U;
 }
 
 /******************************************************************************************
@@ -151,16 +176,20 @@ void SPI_DeInit(SPI_RegDef_t *pSPIx) {
 }
 
 /******************************************************************************************
- * @fn                 - GPIO_ReadFromInputPin
+ * @fn                 - SPI_SendData
  *
- * @brief              - Reads the digital state of a specific pin on a given GPIO port
+ * @brief              - Sends Len bytes over the SPI bus
  *
- * @param[in]          - base address of the gpio peripheral
- * @param[in]          - pin number to read from (0 to 15)
+ * @param[in]          - base address of the SPI peripheral
+ * @param[in]          - pointer to the transmit buffer
+ * @param[in]          - number of bytes to send (must be even in 16-bit mode)
  *
- * @return             - 0 or 1
+ * @return             - none
  *
- * @Note               - this is a blocking call
+ * @Note               - blocking call. It returns when the last byte is in the transmit
+ *                       buffer, not when it has left the wire: check SPI_IsBusy() before
+ *                       disabling the peripheral. Received bytes are not read here, so in
+ *                       full duplex read them (SPI_ReceiveData) or OVR will be set
  *
  ******************************************************************************************/
 void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
@@ -168,7 +197,7 @@ void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
 		return;
 	}
 
-	uint8_t dff_bit = (pSPIx->CR1 >> 11) & 0x01;
+	uint8_t dff_bit = (pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	// Safety check: 16-bit mode requires an even number of bytes
 	if (dff_bit == SPI_DFF_16BITS && (Len % 2 != 0)) {
@@ -191,15 +220,18 @@ void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
 }
 
 /******************************************************************************************
- * @fn                 - GPIO_ReadFromInputPort
+ * @fn                 - SPI_ReceiveData
  *
- * @brief              - Reads the digital state of an entire GPIO port
+ * @brief              - Receives Len bytes from the SPI bus
  *
- * @param[in]          - base address of the gpio peripheral
+ * @param[in]          - base address of the SPI peripheral
+ * @param[in]          - pointer to the receive buffer
+ * @param[in]          - number of bytes to receive (must be even in 16-bit mode)
  *
- * @return             - 16-bit value representing the entire port status
+ * @return             - none
  *
- * @Note               - none
+ * @Note               - blocking call. A master only receives while it clocks, so in
+ *                       master mode send one dummy byte per byte you want to receive
  *
  ******************************************************************************************/
 void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
@@ -207,7 +239,7 @@ void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
 		return;
 	}
 
-	uint8_t dff_bit = (pSPIx->CR1 >> 11) & 0x01;
+	uint8_t dff_bit = (pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	// Safety check: 16-bit mode requires an even number of bytes
 	if (dff_bit == SPI_DFF_16BITS && (Len % 2 != 0)) {
@@ -230,102 +262,50 @@ void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
 }
 
 /******************************************************************************************
- * @fn                 - GPIO_IRQInterruptConfig
+ * @fn                 - SPI_IRQInterruptConfig
  *
- * @brief              - Enables or disables the interrupt processing for a given IRQ number in NVIC
+ * @brief              - Enables or disables the SPI interrupt line in the NVIC
  *
- * @param[in]          - IRQ number to configure
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
  * @param[in]          - ENABLE or DISABLE macros
  *
  * @return             - none
  *
- * @Note               - Configures the ARM Cortex-M4 NVIC registers
+ * @Note               - same as NVIC_IRQInterruptConfig, kept so the SPI API is complete
  *
  ******************************************************************************************/
-void SPI_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi)
-{
-    if (EnorDi == ENABLE)
-    {
-        if (IRQNumber < 32)
-        {
-            NVIC_ISER0 = (1U << IRQNumber);
-        }
-        else if (IRQNumber < 64)
-        {
-            NVIC_ISER1 = (1U << (IRQNumber - 32));
-        }
-        else if (IRQNumber < 96)
-        {
-            NVIC_ISER2 = (1U << (IRQNumber - 64));
-        }
-    }
-    else // DISABLE
-    {
-        if (IRQNumber < 32)
-        {
-            NVIC_ICER0 = (1U << IRQNumber);
-        }
-        else if (IRQNumber < 64)
-        {
-            NVIC_ICER1 = (1U << (IRQNumber - 32));
-        }
-        else if (IRQNumber < 96)
-        {
-            NVIC_ICER2 = (1U << (IRQNumber - 64));
-        }
-    }
+void SPI_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
+	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
 }
 
 /******************************************************************************************
- * @fn                 - GPIO_IRQPriorityConfig
+ * @fn                 - SPI_IRQPriorityConfig
  *
- * @brief              - Configures the priority level of a given IRQ number in the NVIC
+ * @brief              - Sets the priority of the SPI interrupt line
  *
- * @param[in]          - IRQ number to configure
- * @param[in]          - priority level value
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
+ * @param[in]          - priority 0 (most urgent) .. 15 (least urgent)
  *
  * @return             - none
  *
- * @Note               - none
+ * @Note               - same as NVIC_IRQPriorityConfig, kept so the SPI API is complete
  *
  ******************************************************************************************/
-void SPI_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority)
-{
-    // Each IPR register handles 4 IRQs (8 bits per IRQ slot).
-    // Cortex-M4 only uses the upper 4 bits of the 8-bit priority field.
-    uint8_t shift_amount = ((IRQNumber % 4) * 8) + 4;
-
-    if (IRQNumber < 4) {
-        NVIC_IPR0 &= ~(0xF0U << ((IRQNumber % 4) * 8)); // Clear old priority MSBs
-        NVIC_IPR0 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber < 8) {
-        NVIC_IPR1 &= ~(0xF0U << ((IRQNumber % 4) * 8));
-        NVIC_IPR1 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber < 12) {
-        NVIC_IPR2 &= ~(0xF0U << ((IRQNumber % 4) * 8));
-        NVIC_IPR2 |= ((uint32_t)IRQPriority << shift_amount);
-    }
-    // Target shared EXTI vector lines directly for optimization
-    else if (IRQNumber == 23) { // EXTI9_5_IRQn
-        NVIC_IPR5 &= ~(0xF0U << ((23 % 4) * 8));
-        NVIC_IPR5 |= ((uint32_t)IRQPriority << shift_amount);
-    } else if (IRQNumber == 40) { // EXTI15_10_IRQn
-        NVIC_IPR10 &= ~(0xF0U << ((40 % 4) * 8));
-        NVIC_IPR10 |= ((uint32_t)IRQPriority << shift_amount);
-    }
+void SPI_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
+	NVIC_IRQPriorityConfig(IRQNumber, IRQPriority);
 }
 
 /******************************************************************************************
- * @fn                 - GPIO_IRQHandling
+ * @fn                 - SPI_IRQHandling
  *
- * @brief              - Clears the pending interrupt status on the EXTI controller line
+ * @brief              - Handles the SPI interrupt sources (TXE, RXNE, OVR)
  *
- * @param[in]          - PinNumber: pin number processing the interrupt (0 to 15)
+ * @param[in]          - pointer to the active SPI Handle structure
  *
  * @return             - none
  *
- * @Note               - Should be called inside the actual ISR vector handler.
- *                       Uses 'rc_w1' mechanics (Write-1-to-Clear).
+ * @Note               - call it from the SPIx_IRQHandler vector. Each flag is only handled
+ *                       when its interrupt enable bit is set too
  *
  ******************************************************************************************/
 void SPI_IRQHandling(SPI_Handle_t *pSPIHandle)
@@ -354,6 +334,21 @@ void SPI_IRQHandling(SPI_Handle_t *pSPIHandle)
 	}
 }
 
+/******************************************************************************************
+ * @fn                 - SPI_SendDataIT
+ *
+ * @brief              - Starts an interrupt driven transmission
+ *
+ * @param[in]          - pointer to the SPI Handle structure
+ * @param[in]          - pointer to the transmit buffer
+ * @param[in]          - number of bytes to send
+ *
+ * @return             - the TX state before the call. SPI_READY means the transfer was
+ *                       accepted, SPI_BUSY_IN_TX means it was rejected
+ *
+ * @Note               - the buffer must stay valid until the SPI_EVENT_TX_CMPLT callback
+ *
+ ******************************************************************************************/
 uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len) {
 	uint8_t state = pSPIHandle->TxState;
 
@@ -369,6 +364,22 @@ uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Le
 	return state;
 }
 
+/******************************************************************************************
+ * @fn                 - SPI_ReceiveDataIT
+ *
+ * @brief              - Starts an interrupt driven reception
+ *
+ * @param[in]          - pointer to the SPI Handle structure
+ * @param[in]          - pointer to the receive buffer
+ * @param[in]          - number of bytes to receive
+ *
+ * @return             - the RX state before the call. SPI_READY means the transfer was
+ *                       accepted, SPI_BUSY_IN_RX means it was rejected
+ *
+ * @Note               - the buffer must stay valid until the SPI_EVENT_RX_CMPLT callback.
+ *                       A master must also send (SPI_SendDataIT) to generate the clock
+ *
+ ******************************************************************************************/
 uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len) {
 	uint8_t state = pSPIHandle->RxState;
 
@@ -384,7 +395,7 @@ uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t
 	return state;
 }
 
-void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
+static void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 	uint8_t dff_bit = (pSPIHandle->Instance->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	if (pSPIHandle->TxLen > 0) {
@@ -410,7 +421,7 @@ void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 	}
 }
 
-void spi_rx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
+static void spi_rx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 	uint8_t dff_bit = (pSPIHandle->Instance->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	if (pSPIHandle->RxLen > 0) {
@@ -441,7 +452,7 @@ void spi_rx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
  * Overrun means a frame arrived while RXNE was still set, so a byte was lost.
  * The flag is cleared by reading DR and then SR, in that order.
  */
-void spi_ovr_interrupt_handle(SPI_Handle_t *pSPIHandle) {
+static void spi_ovr_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 	uint8_t temp;
 
 	// Do not consume the byte if a reception is still in progress
@@ -458,4 +469,6 @@ __attribute__((weak)) void SPI_ApplicationEventCallback(SPI_Handle_t *pSPIHandle
 {
     // This is an empty placeholder.
     // The user can override this function in main.c without modifying the driver!
+    (void)pSPIHandle;
+    (void)AppEv;
 }

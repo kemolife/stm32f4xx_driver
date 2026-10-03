@@ -151,8 +151,19 @@ void I2C_EV_IRQHandling(I2C_Handle_t *pI2CHandle);
  */
 void I2C_ER_IRQHandling(I2C_Handle_t *pI2CHandle);
 
+/**
+ * @brief  Enables or disables the I2C peripheral (CR1 PE bit)
+ * @param  pI2Cx: Base address of the I2C peripheral
+ * @param  EnorDi: ENABLE or DISABLE macros
+ * @note   Call after I2C_Init: FREQ, CCR and TRISE can only be written while PE is 0
+ */
 void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi);
 
+/**
+ * @brief  Reports whether any transfer is in progress on the bus (SR2 BUSY)
+ * @param  pI2Cx: Base address of the I2C peripheral
+ * @return 1 between a START and a STOP from any master, 0 when the bus is free
+ */
 int I2C_IsBusy(I2C_RegDef_t *pI2Cx);
 
 /**
@@ -162,8 +173,18 @@ int I2C_IsBusy(I2C_RegDef_t *pI2Cx);
  */
 void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t EnorDi);
 
+/**
+ * @brief  Starts an interrupt driven write to a slave as bus master
+ * @return State before the call. I2C_READY means the transfer was accepted
+ * @note   The buffer must stay valid until the I2C_EVENT_TX_CMPLT callback
+ */
 uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
+/**
+ * @brief  Starts an interrupt driven read from a slave as bus master
+ * @return State before the call. I2C_READY means the transfer was accepted
+ * @note   The buffer must stay valid until the I2C_EVENT_RX_CMPLT callback
+ */
 uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
 /**

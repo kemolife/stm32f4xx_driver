@@ -351,6 +351,20 @@ int I2C_IsBusy(I2C_RegDef_t *pI2Cx) {
 	return (pI2Cx->SR2 & (1U << I2C_SR2_BUSY)) ? 1 : 0;
 }
 
+/******************************************************************************************
+ * @fn                 - I2C_ManageAcking
+ *
+ * @brief              - Enables or disables automatic ACK after each received byte
+ *
+ * @param[in]          - base address of the I2C peripheral
+ * @param[in]          - I2C_ACK_ENABLE or I2C_ACK_DISABLE
+ *
+ * @return             - none
+ *
+ * @Note               - a slave only answers its address while ACK is 1. RM0390: hardware
+ *                       clears ACK while PE is 0, so call this after PE is set
+ *
+ ******************************************************************************************/
 void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t EnorDi) {
     // ACK lives in CR1 bit 10. SR1 is status only and must never be used here.
     if (EnorDi == I2C_ACK_ENABLE) {
@@ -478,60 +492,35 @@ uint8_t I2C_SlaveReceiveData(I2C_RegDef_t *pI2Cx) {
 /******************************************************************************************
  * @fn                 - I2C_IRQInterruptConfig
  *
- * @brief              - Enables or disables the interrupt processing for a given IRQ number in NVIC
+ * @brief              - Enables or disables the I2C interrupt line in the NVIC
  *
- * @param[in]          - IRQ number to configure
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
  * @param[in]          - ENABLE or DISABLE macros
  *
  * @return             - none
  *
- * @Note               - ISER/ICER are write-1-to-act, so a plain assignment is correct here
- *                       and a read-modify-write would be wrong
+ * @Note               - same as NVIC_IRQInterruptConfig, kept so the I2C API is complete
  *
  ******************************************************************************************/
 void I2C_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	if (EnorDi == ENABLE) {
-		if (IRQNumber < 32U) {
-			NVIC_ISER0 = (1U << IRQNumber);
-		} else if (IRQNumber < 64U) {
-			NVIC_ISER1 = (1U << (IRQNumber % 32U));
-		} else if (IRQNumber < 96U) {
-			NVIC_ISER2 = (1U << (IRQNumber % 32U));
-		}
-	} else {
-		if (IRQNumber < 32U) {
-			NVIC_ICER0 = (1U << IRQNumber);
-		} else if (IRQNumber < 64U) {
-			NVIC_ICER1 = (1U << (IRQNumber % 32U));
-		} else if (IRQNumber < 96U) {
-			NVIC_ICER2 = (1U << (IRQNumber % 32U));
-		}
-	}
+	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
 }
 
 /******************************************************************************************
  * @fn                 - I2C_IRQPriorityConfig
  *
- * @brief              - Configures the priority level of a given IRQ number in the NVIC
+ * @brief              - Sets the priority of the I2C interrupt line
  *
- * @param[in]          - IRQ number to configure
- * @param[in]          - priority level value
+ * @param[in]          - IRQ number, one of the IRQ_NO_* macros
+ * @param[in]          - priority 0 (most urgent) .. 15 (least urgent)
  *
  * @return             - none
  *
- * @Note               - I2C IRQ numbers are 31..34 and 72..73, so the priority register is
- *                       reached through the generic base pointer rather than a named macro
+ * @Note               - same as NVIC_IRQPriorityConfig, kept so the I2C API is complete
  *
  ******************************************************************************************/
 void I2C_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
-	/* Four IRQs share one 32-bit priority register, one byte each. Only the top
-	 * NO_PR_BITS_IMPLEMENTED bits of that byte are wired up on this core. */
-	uint8_t iprx = IRQNumber / 4U;
-	uint8_t iprx_section = IRQNumber % 4U;
-	uint8_t shift_amount = (iprx_section * 8U) + (8U - NO_PR_BITS_IMPLEMENTED);
-
-	NVIC_PR_BASE_ADDR[iprx] &= ~(0xFFUL << (iprx_section * 8U));
-	NVIC_PR_BASE_ADDR[iprx] |= (IRQPriority << shift_amount);
+	NVIC_IRQPriorityConfig(IRQNumber, IRQPriority);
 }
 
 /******************************************************************************************

@@ -19,6 +19,7 @@ pins, real interrupts. Nothing is mocked.
 | `test_main.c`     | `main`: runs all suites, drives the result LED              |
 | `test_harness.*`  | `CHECK`, `SKIP`, timeouts (DWT), wire check, NVIC read back |
 | `test_rcc.c`      | clock tree math against hand-computed RM0390 values         |
+| `test_nvic.c`     | enable/disable at register edges (0..96), priority slots    |
 | `test_gpio.c`     | pin fields, AF, pull-up/down, EXTI config, EXTI interrupts  |
 | `test_spi.c`      | SPI2 master: config, NVIC, polling / IT / OVR loopback      |
 | `test_i2c.c`      | I2C1 master <-> I2C3 slave: timing regs, ACK, IT + blocking |

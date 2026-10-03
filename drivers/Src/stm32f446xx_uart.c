@@ -363,15 +363,13 @@ uint8_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint3
  *
  * @return             - none
  *
- * @Note               - UART IRQs are 37..39, 52, 53 and 71, so ISER1 and ISER2 are needed.
- *                       ISER/ICER are write-1-to-act, use plain assignment
+ * @Note               - UART IRQs are 37..39, 52, 53 and 71
  *
  ******************************************************************************************/
 void UART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	/* 1. ENABLE:  IRQNumber < 32 -> NVIC_ISER0, < 64 -> NVIC_ISER1, < 96 -> NVIC_ISER2
-	 *    write (1U << (IRQNumber % 32)).
-	 * 2. DISABLE: same ranges on NVIC_ICER0..2.
-	 * Same logic as I2C_IRQInterruptConfig. */
+	/* 1. One line: call NVIC_IRQInterruptConfig(IRQNumber, EnorDi).
+	 *    The NVIC logic lives in stm32f446xx_nvic.c for every driver,
+	 *    see GPIO_IRQInterruptConfig for the same wrapper. */
 
 	/* TODO: implement */
 	(void)IRQNumber;
@@ -388,15 +386,11 @@ void UART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
  *
  * @return             - none
  *
- * @Note               - only the top NO_PR_BITS_IMPLEMENTED bits of each byte exist
+ * @Note               - priority 0 (most urgent) .. 15 (least urgent)
  *
  ******************************************************************************************/
 void UART_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
-	/* 1. iprx         = IRQNumber / 4
-	 * 2. iprx_section = IRQNumber % 4
-	 * 3. shift_amount = (iprx_section * 8) + (8 - NO_PR_BITS_IMPLEMENTED)
-	 * 4. Clear the byte, then OR in (IRQPriority << shift_amount) on
-	 *    NVIC_PR_BASE_ADDR[iprx]. Same logic as I2C_IRQPriorityConfig. */
+	/* 1. One line: call NVIC_IRQPriorityConfig(IRQNumber, IRQPriority). */
 
 	/* TODO: implement */
 	(void)IRQNumber;
