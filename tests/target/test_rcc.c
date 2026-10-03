@@ -30,8 +30,6 @@
                              (0x3U   << RCC_PLLCFGR_PLLP) | \
                              (0x1U   << RCC_PLLCFGR_PLLSRC))
 
-#define RCC_CR_PLLON      24
-
 static void test_sysclk_after_reset(void) {
 	uint32_t sws = (RCC->CFGR >> RCC_CFGR_SWS) & 0x3U;
 
@@ -142,10 +140,124 @@ static void test_pll_output_calc(void) {
 	CHECK(RCC->PLLCFGR == saved, "PLLCFGR not restored");
 }
 
+static void test_clock_config_rejects_bad_input(void) {
+	/* Each case breaks exactly one rule. Nothing may change in hardware. */
+	static const struct {
+		RCC_ClockConfig_t cfg;
+		const char *why;
+	} cases[] = {
+		{ { RCC_OSC_HSI, 1, 180, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "PLLM 1 accepted (min 2)" },
+		{ { RCC_OSC_HSI, 8,  49, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "PLLN 49 accepted (min 50)" },
+		{ { RCC_OSC_HSI, 8, 180, 3, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "PLLP 3 accepted (2/4/6/8 only)" },
+		{ { RCC_OSC_HSI, 4, 180, 4, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "VCO input 4 MHz accepted (max 2.1)" },
+		{ { RCC_OSC_HSI, 8, 300, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "SYSCLK 300 MHz accepted (VCO 600)" },
+		{ { RCC_OSC_HSE_BYPASS, 4, 200, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "SYSCLK 200 MHz accepted" },
+		{ { RCC_OSC_HSI, 8, 180, 2, RCC_AHB_DIV1, RCC_APB_DIV2, RCC_APB_DIV2 }, "PCLK1 90 MHz accepted (max 45)" },
+		{ { RCC_OSC_HSI, 8, 180, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV1 }, "PCLK2 180 MHz accepted (max 90)" },
+		{ { 7,           8, 180, 2, RCC_AHB_DIV1, RCC_APB_DIV4, RCC_APB_DIV2 }, "unknown OscSource accepted" },
+	};
+
+	uint32_t cfgr = RCC->CFGR;
+	uint32_t cr = RCC->CR;
+	uint32_t pll = RCC->PLLCFGR;
+
+	for (uint32_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		CHECK(RCC_ClockConfig(&cases[i].cfg) == RCC_ERROR_CONFIG, cases[i].why);
+	}
+
+	CHECK(RCC->CFGR == cfgr,   "CFGR changed by a rejected config");
+	CHECK(RCC->CR == cr,       "CR changed by a rejected config");
+	CHECK(RCC->PLLCFGR == pll, "PLLCFGR changed by a rejected config");
+}
+
+static void test_systick_16mhz(void) {
+	if (RCC_GetHCLKValue() != HSI_VALUE) {
+		SKIP("HCLK is not 16 MHz");
+		return;
+	}
+
+	SYSTICK_Init();
+	CHECK(SYSTICK->LOAD == 15999U, "LOAD at 16 MHz expected 15999 (16000 cycles = 1 ms)");
+	CHECK(SYSTICK->CTRL & (1U << SYSTICK_CTRL_CLKSOURCE), "SysTick not on the processor clock");
+	CHECK(((SCB_SHPR3 >> 28) & 0xFU) == SYSTICK_IRQ_PRIORITY, "SysTick priority not lowest (15)");
+
+	uint32_t t0 = SYSTICK_GetTick();
+	uint32_t c0 = test_cycles();
+	SYSTICK_DelayMs(10);
+	uint32_t cycles = test_cycles() - c0;
+	uint32_t ticks = SYSTICK_GetTick() - t0;
+
+	/* At least 10 ms, at most 11 ms (+ a little code time) */
+	printf("    DelayMs(10) = %lu cycles, %lu ticks\n", (unsigned long)cycles, (unsigned long)ticks);
+	CHECK(cycles >= 160000U, "DelayMs(10) returned before 10 ms");
+	CHECK(cycles <= 180000U, "DelayMs(10) took longer than 11 ms");
+	CHECK(ticks >= 10U && ticks <= 11U, "tick counter did not advance 10..11 times");
+
+	SYSTICK->CTRL = 0U;
+}
+
+static void test_clock_180mhz_and_back(void) {
+	/* Nothing is printed while at 180 MHz: SWO runs from HCLK, so the SWV
+	 * console would show garbage. Results are collected, the clock is put
+	 * back to 16 MHz, then checked. */
+	test_delay_ms(5);   // let the ITM FIFO drain
+
+	uint8_t  status  = RCC_SetSysClock180MHz();
+	uint32_t sws     = (RCC->CFGR >> RCC_CFGR_SWS) & 0x3U;
+	uint32_t hse     = (RCC->PLLCFGR >> RCC_PLLCFGR_PLLSRC) & 0x1U;
+	uint32_t sysclk  = RCC_GetSysClkValue();
+	uint32_t hclk    = RCC_GetHCLKValue();
+	uint32_t pclk1   = RCC_GetPCLK1Value();
+	uint32_t pclk2   = RCC_GetPCLK2Value();
+	uint32_t latency = (FLASH->ACR >> FLASH_ACR_LATENCY) & 0xFU;
+	uint32_t odrdy   = (PWR->CSR >> PWR_CSR_ODSWRDY) & 0x1U;
+
+	/* SysTick at 180 MHz: real time measured with the cycle counter */
+	SYSTICK_Init();
+	uint32_t load = SYSTICK->LOAD;
+	uint32_t c0 = test_cycles();
+	SYSTICK_DelayMs(10);
+	uint32_t cycles = test_cycles() - c0;
+
+	RCC_DeInit();   // also re-programs SysTick for 16 MHz
+	uint32_t sws_after     = (RCC->CFGR >> RCC_CFGR_SWS) & 0x3U;
+	uint32_t latency_after = (FLASH->ACR >> FLASH_ACR_LATENCY) & 0xFU;
+	uint32_t pll_after     = (RCC->CR >> RCC_CR_PLLRDY) & 0x1U;
+	uint32_t od_after      = (PWR->CR >> PWR_CR_ODEN) & 0x1U;
+	uint32_t load_after    = SYSTICK->LOAD;
+	SYSTICK->CTRL = 0U;
+
+	test_delay_ms(5);
+	printf("    status=%u source=%s SYSCLK=%lu PCLK1=%lu PCLK2=%lu WS=%lu DelayMs(10)=%lu cycles\n",
+	       status, hse ? "HSE" : "HSI", (unsigned long)sysclk, (unsigned long)pclk1,
+	       (unsigned long)pclk2, (unsigned long)latency, (unsigned long)cycles);
+
+	CHECK(status == RCC_OK,           "RCC_SetSysClock180MHz did not return RCC_OK");
+	CHECK(sws == RCC_SWS_PLL_P,       "SWS does not show the PLL as SYSCLK");
+	CHECK(sysclk == 180000000U,       "SYSCLK not 180 MHz");
+	CHECK(hclk == 180000000U,         "HCLK not 180 MHz");
+	CHECK(pclk1 == 45000000U,         "PCLK1 not 45 MHz");
+	CHECK(pclk2 == 90000000U,         "PCLK2 not 90 MHz");
+	CHECK(latency == 5U,              "flash latency not 5 wait states");
+	CHECK(odrdy == 1U,                "over-drive switch not ready");
+	CHECK(load == 179999U,            "SysTick LOAD at 180 MHz expected 179999");
+	CHECK(cycles >= 1800000U && cycles <= 2000000U, "DelayMs(10) at 180 MHz not 10..11 ms");
+
+	CHECK(sws_after == RCC_SWS_HSI,   "RCC_DeInit: SYSCLK not back on HSI");
+	CHECK(latency_after == 0U,        "RCC_DeInit: flash latency not 0");
+	CHECK(pll_after == 0U,            "RCC_DeInit: PLL still running");
+	CHECK(od_after == 0U,             "RCC_DeInit: over-drive still on");
+	CHECK(load_after == 15999U,       "RCC_DeInit: SysTick not re-programmed for 16 MHz");
+	CHECK(RCC_GetSysClkValue() == HSI_VALUE, "RCC_DeInit: SYSCLK not 16 MHz");
+}
+
 void test_suite_rcc(void) {
 	test_suite_begin("rcc");
 
 	test_run(test_sysclk_after_reset, "rcc_sysclk_after_reset");
 	test_run(test_bus_prescalers,     "rcc_bus_prescalers");
 	test_run(test_pll_output_calc,    "rcc_pll_output_calc");
+	test_run(test_clock_config_rejects_bad_input, "rcc_clock_config_rejects_bad_input");
+	test_run(test_systick_16mhz,                  "rcc_systick_16mhz");
+	test_run(test_clock_180mhz_and_back,          "rcc_clock_180mhz_and_back");
 }

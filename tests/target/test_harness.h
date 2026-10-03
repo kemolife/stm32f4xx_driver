@@ -63,6 +63,11 @@ void test_print_summary(void);
 
 void test_delay_ms(uint32_t ms);
 
+/* Raw CPU cycle counter (DWT CYCCNT). Counts HCLK cycles, wraps after 2^32.
+ * Note: test_delay_ms / test_wait_* assume 16 MHz; do not use them while a
+ * test has switched to another clock. */
+uint32_t test_cycles(void);
+
 /* Waits until *counter >= target. Returns 1 on success, 0 on timeout. */
 int test_wait_count(volatile uint8_t *counter, uint8_t target, uint32_t timeout_ms);
 

@@ -33,6 +33,12 @@
 #define GPIOH_BASE            (AHB1_BASE + 0x1C00U)
 
 #define RCC_BASE              (AHB1_BASE + 0x3800UL)
+#define FLASH_R_BASE          (AHB1_BASE + 0x3C00UL) /* Flash interface registers (not the memory) */
+#define PWR_BASE              (APB1_BASE + 0x7000UL)
+
+/* Cortex-M4 core peripherals */
+#define SYSTICK_BASE          0xE000E010UL
+#define SCB_SHPR3             (*(volatile uint32_t*)0xE000ED20UL) /* SysTick priority in [31:24] */
 
 
 #define I2C1_BASE             (APB1_BASE + 0x5400U)
@@ -130,6 +136,36 @@ typedef struct {
     volatile uint32_t DCKCFGR2;     /* RCC dedicated clock configuration reg 2,   Address offset: 0x94 */
 } RCC_RegDef_t;
 
+/**
+ * Power controller (PWR) register structure definition
+ */
+typedef struct {
+    volatile uint32_t CR;           /* PWR power control register,                Address offset: 0x00 */
+    volatile uint32_t CSR;          /* PWR power control/status register,         Address offset: 0x04 */
+} PWR_RegDef_t;
+
+/**
+ * Flash interface register structure definition
+ */
+typedef struct {
+    volatile uint32_t ACR;          /* Flash access control register,              Address offset: 0x00 */
+    volatile uint32_t KEYR;         /* Flash key register,                         Address offset: 0x04 */
+    volatile uint32_t OPTKEYR;      /* Flash option key register,                  Address offset: 0x08 */
+    volatile uint32_t SR;           /* Flash status register,                      Address offset: 0x0C */
+    volatile uint32_t CR;           /* Flash control register,                     Address offset: 0x10 */
+    volatile uint32_t OPTCR;        /* Flash option control register,              Address offset: 0x14 */
+} FLASH_RegDef_t;
+
+/**
+ * SysTick timer (Cortex-M4 core) register structure definition
+ */
+typedef struct {
+    volatile uint32_t CTRL;         /* SysTick control and status register,        Address offset: 0x00 */
+    volatile uint32_t LOAD;         /* SysTick reload value register (24 bit),     Address offset: 0x04 */
+    volatile uint32_t VAL;          /* SysTick current value register,             Address offset: 0x08 */
+    volatile uint32_t CALIB;        /* SysTick calibration value register,         Address offset: 0x0C */
+} SYSTICK_RegDef_t;
+
 typedef struct
 {
 	volatile uint32_t IMR;    /* Interrupt mask register            (Address offset: 0x00) */
@@ -216,6 +252,9 @@ typedef struct {
 #define USART6 ((UART_RegDef_t *)USART6_BASE)
 
 #define RCC ((RCC_RegDef_t *)RCC_BASE)
+#define PWR ((PWR_RegDef_t *)PWR_BASE)
+#define FLASH ((FLASH_RegDef_t *)FLASH_R_BASE)
+#define SYSTICK ((SYSTICK_RegDef_t *)SYSTICK_BASE)
 #define EXTI ((EXTI_RegDef_t *)EXTI_BASE)
 #define SYSCFG ((SYSCFG_RegDef_t *)SYSCFG_BASE)
 
@@ -498,6 +537,28 @@ typedef struct {
 #define USART_CR3_ONEBIT                   11  /* One sample bit method enable            */
 
 /* ========================================================================== */
+/*   PWR: clock macros and bit positions                                      */
+/* ========================================================================== */
+#define PWR_PCLK_EN()       (RCC->APB1ENR |= (1 << 28))
+#define PWR_PCLK_DI()       (RCC->APB1ENR &= ~(1 << 28))
+
+#define PWR_CR_VOS                         14  /* Regulator voltage scaling [15:14], 11 = scale 1 */
+#define PWR_CR_ODEN                        16  /* Over-drive enable                       */
+#define PWR_CR_ODSWEN                      17  /* Over-drive switching enable             */
+
+#define PWR_CSR_VOSRDY                     14  /* Voltage scaling ready                   */
+#define PWR_CSR_ODRDY                      16  /* Over-drive mode ready                   */
+#define PWR_CSR_ODSWRDY                    17  /* Over-drive switching ready              */
+
+/* ========================================================================== */
+/*   FLASH interface bit positions                                            */
+/* ========================================================================== */
+#define FLASH_ACR_LATENCY                   0  /* Wait states [3:0]                       */
+#define FLASH_ACR_PRFTEN                    8  /* Prefetch enable                         */
+#define FLASH_ACR_ICEN                      9  /* Instruction cache enable                */
+#define FLASH_ACR_DCEN                     10  /* Data cache enable                       */
+
+/* ========================================================================== */
 /*   SYSCFG Peripheral Clock Macros                                           */
 /* ========================================================================== */
 /* SYSCFG is on the APB2 bus */
@@ -550,6 +611,7 @@ typedef struct {
 #define NVIC_IRQ_PRI15      15U /* Absolute Lowest Priority */
 
 #include "stm32f446xx_rcc.h"
+#include "stm32f446xx_systick.h"
 #include "stm32f446xx_nvic.h"
 #include "stm32f446xx_gpio.h"
 #include "stm32f446xx_spi.h"

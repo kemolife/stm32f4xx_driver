@@ -131,6 +131,10 @@ void test_print_summary(void) {
 /*   Time                                                                     */
 /* ========================================================================== */
 
+uint32_t test_cycles(void) {
+	return DWT_CYCCNT;
+}
+
 void test_delay_ms(uint32_t ms) {
 	uint32_t start = DWT_CYCCNT;
 	uint32_t span = ms * cycles_per_ms;

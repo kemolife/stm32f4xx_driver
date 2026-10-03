@@ -76,7 +76,7 @@
 					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Inc"/>
-						<entry excluding="spi_message_receive_it.c|uart_cmd_handling_it.c|spi_cmd_handling_pico2w.c|spi_tx_pico2w.c|spi_tx.c|gpio_button_interrupt.c|gpio_led.c|gpio_button.c|gpio_board_led.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Src"/>
+						<entry excluding="rcc_clock_180mhz.c|spi_message_receive_it.c|uart_cmd_handling_it.c|spi_cmd_handling_pico2w.c|spi_tx_pico2w.c|spi_tx.c|gpio_button_interrupt.c|gpio_led.c|gpio_button.c|gpio_board_led.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Src"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Startup"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="drivers"/>
 					</sourceEntries>

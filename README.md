@@ -17,7 +17,8 @@ Target board: **NUCLEO-F446RE**. Toolchain: **STM32CubeIDE** (arm-none-eabi-gcc)
 | SPI    | `stm32f446xx_spi.*`  | master/slave, 8/16-bit, polling and interrupt |
 | I2C    | `stm32f446xx_i2c.*`  | master polling and interrupt, slave via callbacks |
 | UART   | `stm32f446xx_uart.*` | **skeleton**: API and step comments, not implemented yet |
-| RCC    | `stm32f446xx_rcc.*`  | reads SYSCLK / PCLK1 / PCLK2 (no clock setup yet) |
+| RCC    | `stm32f446xx_rcc.*`  | clock setup up to 180 MHz (HSE/HSI + PLL), reads SYSCLK / HCLK / PCLK1 / PCLK2 |
+| SysTick| `stm32f446xx_systick.*` | 1 ms tick, `SYSTICK_GetTick`, `SYSTICK_DelayMs` |
 | NVIC   | `stm32f446xx_nvic.*` | enable/disable and priority for IRQ 0..96 |
 
 `stm32f446xx.h` is the device header: memory map, register structs, clock and
@@ -50,6 +51,7 @@ tests/        on-target driver tests (not part of the normal build)
 | `gpio_led.c`               | blink an LED                           | LED on PA6 |
 | `gpio_button.c`            | read a button by polling               | button PC5, LED PA6 |
 | `gpio_button_interrupt.c`  | read a button with an EXTI interrupt   | button PC5, LED PA6 |
+| `rcc_clock_180mhz.c`       | switch to 180 MHz, SysTick delay       | none (LD2), scope on PC9 optional |
 | `spi_tx.c`                 | SPI master, send once                  | logic analyzer on PB13/PB15 |
 | `spi_tx_pico2w.c`          | SPI master, send on button press       | Raspberry Pi Pico 2 W as slave |
 | `spi_cmd_handling_pico2w.c`| SPI command / answer protocol          | Raspberry Pi Pico 2 W as slave |
@@ -58,6 +60,30 @@ tests/        on-target driver tests (not part of the normal build)
 | `uart_cmd_handling_it.c`   | UART interrupt command shell           | none (ST-LINK virtual COM port) |
 
 The UART examples need the UART driver to be implemented first.
+
+## Clock
+
+After reset the MCU runs on the internal 16 MHz HSI, and every example
+except `rcc_clock_180mhz.c` stays there. To run at full speed:
+
+```c
+if (RCC_SetSysClock180MHz() != RCC_OK) {
+    /* still on 16 MHz HSI */
+}
+SYSTICK_DelayMs(100);   // starts SysTick on first use
+```
+
+`RCC_SetSysClock180MHz` gives SYSCLK/HCLK 180 MHz, PCLK1 45 MHz, PCLK2
+90 MHz, from the 8 MHz ST-LINK clock (HSE bypass), or from the HSI if that is
+missing. For other values fill an `RCC_ClockConfig_t` and call
+`RCC_ClockConfig`; it checks every limit, sets flash wait states and
+over-drive itself, and returns to 16 MHz on any error.
+
+Drivers read the bus clock at `XXX_Init` time, so **change the clock first,
+then initialise the peripherals**. SPI speed is a divider of the bus clock:
+the same `SPI_SCLK_SPEED_DIV32` gives 500 kHz at 16 MHz but 1.4 MHz at
+45 MHz. With SWV printf, set the core clock in the debug configuration to
+the new HCLK.
 
 ## Using a driver
 
@@ -128,6 +154,7 @@ See [tests/README.md](tests/README.md).
 
 - Blocking functions wait without a timeout. If the hardware does not answer
   (missing slave, wrong wiring) they never return.
-- RCC can read the clock tree but not configure it; the board runs on the
-  16 MHz HSI.
+- RCC configures the main PLL only: no PLLI2S / PLLSAI, no USB 48 MHz setup,
+  no LSE / RTC clock.
+- Flash wait states assume a 2.7..3.6 V supply (true on the NUCLEO board).
 - No DMA support.
