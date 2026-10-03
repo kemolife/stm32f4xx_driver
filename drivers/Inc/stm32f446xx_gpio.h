@@ -13,17 +13,17 @@
  * @brief GPIO Pin Configuration structure definition
  */
 typedef struct {
-    uint8_t GPIO_PinNumber;       /* Pin number selection (0 to 15)                 */
-    uint8_t GPIO_PinMode;         /*!< possible value from @GPIO_PIN_MODES >        */
-    uint8_t GPIO_PinSpeed;        /*!< possible value from @GPIO_PIN_OUTPUT_SPEED > */
-    uint8_t GPIO_PinPuPdControl;  /*!< possible value from @GPIO_PIN_PUPD > */
-    uint8_t GPIO_PinOPType;       /*!< possible value from @GPIO_PIN_OUTPUT_PYPES > */
-    uint8_t GPIO_PinAltFunMode;   /* Alternate function selection (AF0 to AF15)     */
+    uint8_t PinNumber;            /* Pin number selection (0 to 15)                 */
+    uint8_t Mode;                 /*!< possible value from @GPIO_PIN_MODES >        */
+    uint8_t Speed;                /*!< possible value from @GPIO_PIN_OUTPUT_SPEED > */
+    uint8_t PuPdControl;          /*!< possible value from @GPIO_PIN_PUPD > */
+    uint8_t OPType;               /*!< possible value from @GPIO_PIN_OUTPUT_PYPES > */
+    uint8_t AltFunMode;           /* Alternate function selection (AF0 to AF15)     */
 } GPIO_PinConfig_t;
 
 typedef struct {
-	GPIO_RegDef_t *pGPIOx;
-	GPIO_PinConfig_t GPIO_PinConfig;
+	GPIO_RegDef_t    *Instance;   /* GPIO port base address (GPIOA ... GPIOH)       */
+	GPIO_PinConfig_t Config;
 } GPIO_Handle_t;
 
 /*

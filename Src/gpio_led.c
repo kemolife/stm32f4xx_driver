@@ -25,12 +25,12 @@ void delay() {
 int main() {
 	GPIO_Handle_t gpioLed;
 
-	gpioLed.pGPIOx = GPIOA;
-	gpioLed.GPIO_PinConfig.GPIO_PinNumber = 6;
-	gpioLed.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_OUT;
-	gpioLed.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_OD;
-	gpioLed.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
-	gpioLed.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	gpioLed.Instance = GPIOA;
+	gpioLed.Config.PinNumber = 6;
+	gpioLed.Config.Mode = GPIO_MODE_OUT;
+	gpioLed.Config.OPType = GPIO_OP_TYPE_OD;
+	gpioLed.Config.PuPdControl = GPIO_PIN_PU;
+	gpioLed.Config.Speed = GPIO_SPEED_FAST;
 
 	GPIO_PeriClockControl(GPIOA, ENABLE);
 	GPIO_Init(&gpioLed);

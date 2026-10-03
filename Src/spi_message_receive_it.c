@@ -75,39 +75,39 @@ void SPI_GPIO_ConfigInit() {
 
 	memset(&gpioSPI, 0, sizeof(GPIO_Handle_t));
 
-	gpioSPI.pGPIOx = GPIOB;
-	gpioSPI.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTFN;
-	gpioSPI.GPIO_PinConfig.GPIO_PinAltFunMode = 5;
-	gpioSPI.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_PP;
-	gpioSPI.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NOT_PUPD;
-	gpioSPI.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	gpioSPI.Instance = GPIOB;
+	gpioSPI.Config.Mode = GPIO_MODE_ALTFN;
+	gpioSPI.Config.AltFunMode = 5;
+	gpioSPI.Config.OPType = GPIO_OP_TYPE_PP;
+	gpioSPI.Config.PuPdControl = GPIO_NOT_PUPD;
+	gpioSPI.Config.Speed = GPIO_SPEED_FAST;
 
 	GPIO_PeriClockControl(GPIOB, ENABLE);
 
-	gpioSPI.GPIO_PinConfig.GPIO_PinNumber = 15;   // MOSI
+	gpioSPI.Config.PinNumber = 15;   // MOSI
 	GPIO_Init(&gpioSPI);
 
-	gpioSPI.GPIO_PinConfig.GPIO_PinNumber = 14;   // MISO
+	gpioSPI.Config.PinNumber = 14;   // MISO
 	GPIO_Init(&gpioSPI);
 
-	gpioSPI.GPIO_PinConfig.GPIO_PinNumber = 13;   // SCK
+	gpioSPI.Config.PinNumber = 13;   // SCK
 	GPIO_Init(&gpioSPI);
 
-	gpioSPI.GPIO_PinConfig.GPIO_PinNumber = 12;   // NSS
+	gpioSPI.Config.PinNumber = 12;   // NSS
 	GPIO_Init(&gpioSPI);
 }
 
 void SPI_ConfigInit() {
 	memset(&SPI2Handle, 0, sizeof(SPI_Handle_t));
 
-	SPI2Handle.pSPIx = SPI2;
-	SPI2Handle.SPI_Config.SPI_DeviceMode = SPI_DEVICE_MODE_MASTER;
-	SPI2Handle.SPI_Config.SPI_BusConfig = SPI_BUS_CONFIG_FULL_DUPLEX;
-	SPI2Handle.SPI_Config.SPI_DFF = SPI_DFF_8BITS;
-	SPI2Handle.SPI_Config.SPI_SclkSpeed = SPI_SCLK_SPEED_DIV32;  // 500 kHz
-	SPI2Handle.SPI_Config.SPI_CPOL = SPI_CPOL_LOW;
-	SPI2Handle.SPI_Config.SPI_CPHA = SPI_CPHA_HIGH;
-	SPI2Handle.SPI_Config.SPI_SSM = SPI_SSM_DI;                  // hardware NSS
+	SPI2Handle.Instance = SPI2;
+	SPI2Handle.Config.DeviceMode = SPI_DEVICE_MODE_MASTER;
+	SPI2Handle.Config.BusConfig = SPI_BUS_CONFIG_FULL_DUPLEX;
+	SPI2Handle.Config.DFF = SPI_DFF_8BITS;
+	SPI2Handle.Config.SclkSpeed = SPI_SCLK_SPEED_DIV32;  // 500 kHz
+	SPI2Handle.Config.CPOL = SPI_CPOL_LOW;
+	SPI2Handle.Config.CPHA = SPI_CPHA_HIGH;
+	SPI2Handle.Config.SSM = SPI_SSM_DI;                  // hardware NSS
 
 	SPI_PeriClockControl(SPI2, ENABLE);
 	SPI_Init(&SPI2Handle);
@@ -123,11 +123,11 @@ void GPIO_AttnInit() {
 
 	memset(&gpioAttn, 0, sizeof(GPIO_Handle_t));
 
-	gpioAttn.pGPIOx = GPIOC;
-	gpioAttn.GPIO_PinConfig.GPIO_PinNumber = ATTN_PIN;
-	gpioAttn.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_IT_RT;   // Pico drives it high
-	gpioAttn.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NOT_PUPD;
-	gpioAttn.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	gpioAttn.Instance = GPIOC;
+	gpioAttn.Config.PinNumber = ATTN_PIN;
+	gpioAttn.Config.Mode = GPIO_MODE_IT_RT;   // Pico drives it high
+	gpioAttn.Config.PuPdControl = GPIO_NOT_PUPD;
+	gpioAttn.Config.Speed = GPIO_SPEED_FAST;
 
 	GPIO_PeriClockControl(GPIOC, ENABLE);
 	GPIO_Init(&gpioAttn);

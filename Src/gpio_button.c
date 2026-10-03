@@ -25,21 +25,21 @@ void delay() {
 int main() {
 	GPIO_Handle_t gpioLed, gpioButton;
 
-	gpioLed.pGPIOx = GPIOA;
-	gpioLed.GPIO_PinConfig.GPIO_PinNumber = 6;
-	gpioLed.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_OUT;
-	gpioLed.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_PP;
-	gpioLed.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NOT_PUPD;
-	gpioLed.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	gpioLed.Instance = GPIOA;
+	gpioLed.Config.PinNumber = 6;
+	gpioLed.Config.Mode = GPIO_MODE_OUT;
+	gpioLed.Config.OPType = GPIO_OP_TYPE_PP;
+	gpioLed.Config.PuPdControl = GPIO_NOT_PUPD;
+	gpioLed.Config.Speed = GPIO_SPEED_FAST;
 
 	GPIO_PeriClockControl(GPIOA, ENABLE);
 	GPIO_Init(&gpioLed);
 
-	gpioButton.pGPIOx = GPIOC;
-	gpioButton.GPIO_PinConfig.GPIO_PinNumber = 5;
-	gpioButton.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_IN;
-	gpioButton.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PIN_PU;
-	gpioButton.GPIO_PinConfig.GPIO_PinSpeed = GPIO_SPEED_FAST;
+	gpioButton.Instance = GPIOC;
+	gpioButton.Config.PinNumber = 5;
+	gpioButton.Config.Mode = GPIO_MODE_IN;
+	gpioButton.Config.PuPdControl = GPIO_PIN_PU;
+	gpioButton.Config.Speed = GPIO_SPEED_FAST;
 
 	GPIO_PeriClockControl(GPIOC, ENABLE);
 	GPIO_Init(&gpioButton);

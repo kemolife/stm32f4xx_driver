@@ -13,15 +13,15 @@
  * @brief I2C Peripheral Configuration structure definition
  */
 typedef struct {
-    uint32_t I2C_SCLSpeed;        /* Serial clock speed in Hz (@I2C_SCLSpeed)             */
-    uint8_t  I2C_DeviceAddress;   /* Own address used when acting as a slave (7-bit)      */
-    uint8_t  I2C_ACKControl;      /* Automatic acknowledge enable/disable (@I2C_ACKControl) */
-    uint8_t  I2C_FMDutyCycle;     /* Fast mode duty cycle (@I2C_FMDutyCycle)              */
+    uint32_t SCLSpeed;            /* Serial clock speed in Hz (@I2C_SCLSpeed)             */
+    uint8_t  DeviceAddress;       /* Own address used when acting as a slave (7-bit)      */
+    uint8_t  ACKControl;          /* Automatic acknowledge enable/disable (@I2C_ACKControl) */
+    uint8_t  FMDutyCycle;         /* Fast mode duty cycle (@I2C_FMDutyCycle)              */
 } I2C_Config_t;
 
 typedef struct {
-	I2C_RegDef_t *pI2Cx;
-	I2C_Config_t I2C_Config;
+	I2C_RegDef_t *Instance;       /* I2C base address (I2C1 ... I2C3)                     */
+	I2C_Config_t Config;
 	uint8_t      *pTxBuffer;
 	uint8_t      *pRxBuffer;
 	uint32_t     TxLen;

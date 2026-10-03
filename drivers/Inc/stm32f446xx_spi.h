@@ -13,18 +13,18 @@
  * @brief GPIO Pin Configuration structure definition
  */
 typedef struct {
-    uint8_t SPI_DeviceMode;       /* Master or Slave configuration (@SPI_DeviceMode)     */
-    uint8_t SPI_BusConfig;        /* Full-duplex, Half-duplex, or Simplex (@SPI_BusConfig) */
-    uint8_t SPI_SclkSpeed;        /* Clock prescaler / Baud rate control (@SPI_SclkSpeed) */
-    uint8_t SPI_DFF;              /* Data Frame Format: 8-bit or 16-bit (@SPI_DFF)       */
-    uint8_t SPI_CPOL;             /* Clock Polarity: Idle low or Idle high (@SPI_CPOL)   */
-    uint8_t SPI_CPHA;             /* Clock Phase: First edge or Second edge (@SPI_CPHA)  */
-    uint8_t SPI_SSM;              /* Software Slave Management: Enable/Disable (@SPI_SSM) */
+    uint8_t DeviceMode;           /* Master or Slave configuration (@SPI_DeviceMode)     */
+    uint8_t BusConfig;            /* Full-duplex, Half-duplex, or Simplex (@SPI_BusConfig) */
+    uint8_t SclkSpeed;            /* Clock prescaler / Baud rate control (@SPI_SclkSpeed) */
+    uint8_t DFF;                  /* Data Frame Format: 8-bit or 16-bit (@SPI_DFF)       */
+    uint8_t CPOL;                 /* Clock Polarity: Idle low or Idle high (@SPI_CPOL)   */
+    uint8_t CPHA;                 /* Clock Phase: First edge or Second edge (@SPI_CPHA)  */
+    uint8_t SSM;                  /* Software Slave Management: Enable/Disable (@SPI_SSM) */
 } SPI_Config_t;
 
 typedef struct {
-	SPI_RegDef_t *pSPIx;
-	SPI_Config_t SPI_Config;
+	SPI_RegDef_t *Instance;       /* SPI base address (SPI1 ... SPI4)                    */
+	SPI_Config_t Config;
 	uint8_t      *pTxBuffer;
 	uint8_t      *pRxBuffer;
 	uint32_t     TxLen;

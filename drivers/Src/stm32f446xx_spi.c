@@ -65,52 +65,52 @@ void SPI_Init(SPI_Handle_t *pSPIHandle){
 	uint32_t temp = 0;
 
 	// 1. Configure device mode MSTR (Master selection - Bit 2)
-	temp |= (pSPIHandle->SPI_Config.SPI_DeviceMode & 0x01) << 2;
+	temp |= (pSPIHandle->Config.DeviceMode & 0x01) << 2;
 
 	// configure bus BIDIMODE
-	if (pSPIHandle->SPI_Config.SPI_BusConfig == SPI_BUS_CONFIG_FULL_DUPLEX) {
+	if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_FULL_DUPLEX) {
 		// BIDIMODE must be clear (0: 2-line unidirectional data mode selected)
 		temp &= ~(1 << 15);
 		temp &= ~(1 << 10);
-	}else if (pSPIHandle->SPI_Config.SPI_BusConfig == SPI_BUS_CONFIG_HALF_DUPLEX) {
+	}else if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_HALF_DUPLEX) {
 		// BIDIMODE must be set (1-line bidirectional data mode selected)
 		temp |= (1 << 15);
 		temp &= ~(1 << 10);
-	}else if (pSPIHandle->SPI_Config.SPI_BusConfig == SPI_BUS_CONFIG_SIMPLEX_RXONLY) {
+	}else if (pSPIHandle->Config.BusConfig == SPI_BUS_CONFIG_SIMPLEX_RXONLY) {
 		// BIDIMODE must be clear (0: 2-line unidirectional data mode selected)
 		temp &= ~(1 << 15);
 		// set RXONLY (Receive only mode enable)
 		temp |= (1 << 10);
 	}
 
-	// 3. Configure SPI_SclkSpeed (BR[2:0] - Bits 5:3)
-	temp |= (pSPIHandle->SPI_Config.SPI_SclkSpeed & 0x07) << 3;
+	// 3. Configure SclkSpeed (BR[2:0] - Bits 5:3)
+	temp |= (pSPIHandle->Config.SclkSpeed & 0x07) << 3;
 
-	// 4. Configure SPI_DFF (Data frame format - Bit 11)
-	temp |= (pSPIHandle->SPI_Config.SPI_DFF & 0x01) << 11;
+	// 4. Configure DFF (Data frame format - Bit 11)
+	temp |= (pSPIHandle->Config.DFF & 0x01) << 11;
 
-	// 5. Configure SPI_CPOL (Clock polarity - Bit 1)
-	temp |= (pSPIHandle->SPI_Config.SPI_CPOL & 0x01) << 1;
+	// 5. Configure CPOL (Clock polarity - Bit 1)
+	temp |= (pSPIHandle->Config.CPOL & 0x01) << 1;
 
-	// 6. Configure SPI_CPHA (Clock phase - Bit 0)
-	temp |= (pSPIHandle->SPI_Config.SPI_CPHA & 0x01) << 0;
+	// 6. Configure CPHA (Clock phase - Bit 0)
+	temp |= (pSPIHandle->Config.CPHA & 0x01) << 0;
 
-	// 7. Configure SPI_SSM (Software Slave Management - Bit 9)
-	temp |= (pSPIHandle->SPI_Config.SPI_SSM & 0x01) << SPI_CR1_SSM;
+	// 7. Configure SSM (Software Slave Management - Bit 9)
+	temp |= (pSPIHandle->Config.SSM & 0x01) << SPI_CR1_SSM;
 
 	// 8. With SSM enabled the NSS level is driven by SSI. In master mode SSI must
 	//    be held high, otherwise NSS reads low and the hardware raises a mode
 	//    fault (MODF), which clears MSTR and SPE.
-	if (pSPIHandle->SPI_Config.SPI_SSM == SPI_SSM_EN &&
-	    pSPIHandle->SPI_Config.SPI_DeviceMode == SPI_DEVICE_MODE_MASTER) {
+	if (pSPIHandle->Config.SSM == SPI_SSM_EN &&
+	    pSPIHandle->Config.DeviceMode == SPI_DEVICE_MODE_MASTER) {
 		temp |= (1 << SPI_CR1_SSI);
 	}
 
-	pSPIHandle->pSPIx->CR1 = temp;
+	pSPIHandle->Instance->CR1 = temp;
 
-	if (pSPIHandle->SPI_Config.SPI_SSM == SPI_SSM_DI &&
-		pSPIHandle->SPI_Config.SPI_DeviceMode == SPI_DEVICE_MODE_MASTER) {
-		pSPIHandle->pSPIx->CR2 |= (1 << SPI_CR2_SSOE);
+	if (pSPIHandle->Config.SSM == SPI_SSM_DI &&
+		pSPIHandle->Config.DeviceMode == SPI_DEVICE_MODE_MASTER) {
+		pSPIHandle->Instance->CR2 |= (1 << SPI_CR2_SSOE);
 	}
 }
 
@@ -330,8 +330,8 @@ void SPI_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority)
  ******************************************************************************************/
 void SPI_IRQHandling(SPI_Handle_t *pSPIHandle)
 {
-	uint32_t statusReg = pSPIHandle->pSPIx->SR;
-	uint32_t controlReg2 = pSPIHandle->pSPIx->CR2;
+	uint32_t statusReg = pSPIHandle->Instance->SR;
+	uint32_t controlReg2 = pSPIHandle->Instance->CR2;
 
 	// 1. Check for TXE (Transmit buffer empty) interrupt
 	uint8_t txe_flag = (statusReg & (1 << SPI_SR_TXE));        // SR bit 1: TXE
@@ -364,7 +364,7 @@ uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Le
 
 	pSPIHandle->TxState = SPI_BUSY_IN_TX;
 
-	pSPIHandle->pSPIx->CR2 |= 1 << SPI_CR2_TXEIE;
+	pSPIHandle->Instance->CR2 |= 1 << SPI_CR2_TXEIE;
 
 	return state;
 }
@@ -379,21 +379,21 @@ uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t
 
 	pSPIHandle->RxState = SPI_BUSY_IN_RX;
 
-	pSPIHandle->pSPIx->CR2 |= 1 << SPI_CR2_RXNEIE;
+	pSPIHandle->Instance->CR2 |= 1 << SPI_CR2_RXNEIE;
 
 	return state;
 }
 
 void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
-	uint8_t dff_bit = (pSPIHandle->pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
+	uint8_t dff_bit = (pSPIHandle->Instance->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	if (pSPIHandle->TxLen > 0) {
 		if (dff_bit == SPI_DFF_8BITS) {
-			*((volatile uint8_t*)&pSPIHandle->pSPIx->DR) = *pSPIHandle->pTxBuffer;
+			*((volatile uint8_t*)&pSPIHandle->Instance->DR) = *pSPIHandle->pTxBuffer;
 			pSPIHandle->pTxBuffer++;
 			pSPIHandle->TxLen--;
 		} else if (dff_bit == SPI_DFF_16BITS){
-			pSPIHandle->pSPIx->DR = *(uint16_t *)pSPIHandle->pTxBuffer;
+			pSPIHandle->Instance->DR = *(uint16_t *)pSPIHandle->pTxBuffer;
 			pSPIHandle->pTxBuffer += 2;
 			pSPIHandle->TxLen -= 2;
 		}
@@ -401,7 +401,7 @@ void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 
 	// If TxLen hits 0, turn off the TXEIE interrupt to stop entering this ISR loop
 	if (pSPIHandle->TxLen == 0) {
-		pSPIHandle->pSPIx->CR2 &= ~(1 << SPI_CR2_TXEIE);
+		pSPIHandle->Instance->CR2 &= ~(1 << SPI_CR2_TXEIE);
 		pSPIHandle->pTxBuffer = NULL;
 		pSPIHandle->TxState = SPI_READY;
 
@@ -411,16 +411,16 @@ void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 }
 
 void spi_rx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
-	uint8_t dff_bit = (pSPIHandle->pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
+	uint8_t dff_bit = (pSPIHandle->Instance->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	if (pSPIHandle->RxLen > 0) {
 		// Pull data from DR depending on DFF size
 		if (dff_bit == SPI_DFF_8BITS) { // 8-bit
-			*pSPIHandle->pRxBuffer = *((volatile uint8_t*)&pSPIHandle->pSPIx->DR);
+			*pSPIHandle->pRxBuffer = *((volatile uint8_t*)&pSPIHandle->Instance->DR);
 			pSPIHandle->pRxBuffer++;
 			pSPIHandle->RxLen--;
 		} else { // 16-bit
-			*(uint16_t*)pSPIHandle->pRxBuffer = pSPIHandle->pSPIx->DR;
+			*(uint16_t*)pSPIHandle->pRxBuffer = pSPIHandle->Instance->DR;
 			pSPIHandle->pRxBuffer += 2;
 			pSPIHandle->RxLen -= 2;
 		}
@@ -428,7 +428,7 @@ void spi_rx_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 
 	// If RxLen hits 0, turn off the RXNEIE interrupt and reset the state
 	if (pSPIHandle->RxLen == 0) {
-		pSPIHandle->pSPIx->CR2 &= ~(1 << SPI_CR2_RXNEIE);
+		pSPIHandle->Instance->CR2 &= ~(1 << SPI_CR2_RXNEIE);
 		pSPIHandle->pRxBuffer = NULL;
 		pSPIHandle->RxState = SPI_READY;
 
@@ -446,8 +446,8 @@ void spi_ovr_interrupt_handle(SPI_Handle_t *pSPIHandle) {
 
 	// Do not consume the byte if a reception is still in progress
 	if (pSPIHandle->RxState != SPI_BUSY_IN_RX) {
-		temp = *((volatile uint8_t*)&pSPIHandle->pSPIx->DR);
-		temp = pSPIHandle->pSPIx->SR;
+		temp = *((volatile uint8_t*)&pSPIHandle->Instance->DR);
+		temp = pSPIHandle->Instance->SR;
 	}
 	(void)temp;
 
