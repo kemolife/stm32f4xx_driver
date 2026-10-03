@@ -82,7 +82,7 @@ static void SPI_GPIO_ConfigInit(void) {
 	gpioSPI.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioSPI.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOB, ENABLE);
+	GPIO_PeriClockControl(GPIOB, DRV_ENABLE);
 
 	gpioSPI.Config.PinNumber = 15;   // MOSI
 	GPIO_Init(&gpioSPI);
@@ -109,13 +109,13 @@ static void SPI_ConfigInit(void) {
 	SPI2Handle.Config.CPHA = SPI_CPHA_HIGH;
 	SPI2Handle.Config.SSM = SPI_SSM_DI;                  // hardware NSS
 
-	SPI_PeriClockControl(SPI2, ENABLE);
+	SPI_PeriClockControl(SPI2, DRV_ENABLE);
 	SPI_Init(&SPI2Handle);
 
 	// SPI_Init does not touch ERRIE; enable it so overruns reach the callback
 	SPI2->CR2 |= (1 << SPI_CR2_ERRIE);
 
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
 }
 
 static void GPIO_AttnInit(void) {
@@ -129,11 +129,11 @@ static void GPIO_AttnInit(void) {
 	gpioAttn.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioAttn.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioAttn);
 
 	GPIO_IRQPriorityConfig(IRQ_NO_EXTI9_5, NVIC_IRQ_PRI15);
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, ENABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DRV_ENABLE);
 }
 
 /* ---------- interrupt handlers ------------------------------------------- */
@@ -204,7 +204,7 @@ int main(void) {
 	SPI_ConfigInit();
 	GPIO_AttnInit();
 
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
 	printf("[SPI] master ready, waiting for Pico attention on PC%d\n", ATTN_PIN);
 

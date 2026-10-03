@@ -106,7 +106,7 @@ static void i2c_pin(GPIO_RegDef_t *port, uint8_t pin) {
 	h.Config.PuPdControl = GPIO_PIN_PU;
 	h.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(port, ENABLE);
+	GPIO_PeriClockControl(port, DRV_ENABLE);
 	GPIO_Init(&h);
 }
 
@@ -120,7 +120,7 @@ static void i2c_gpio_init(void) {
 /* Clean start for one peripheral: reset, clock on, fresh handle, I2C_Init. PE stays 0. */
 static void i2c_setup(I2C_Handle_t *h, I2C_RegDef_t *regs, uint32_t speed,
                       uint8_t duty, uint8_t own_addr) {
-	I2C_PeriClockControl(regs, ENABLE);
+	I2C_PeriClockControl(regs, DRV_ENABLE);
 	I2C_DeInit(regs);
 
 	memset(h, 0, sizeof(*h));
@@ -138,14 +138,14 @@ static void i2c_setup(I2C_Handle_t *h, I2C_RegDef_t *regs, uint32_t speed,
 /* ========================================================================== */
 
 static void test_clock_control(void) {
-	I2C_PeriClockControl(I2C1, ENABLE);
+	I2C_PeriClockControl(I2C1, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 21), "I2C1 clock not enabled (APB1ENR bit 21)");
-	I2C_PeriClockControl(I2C2, ENABLE);
+	I2C_PeriClockControl(I2C2, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 22), "I2C2 clock not enabled (APB1ENR bit 22)");
-	I2C_PeriClockControl(I2C3, ENABLE);
+	I2C_PeriClockControl(I2C3, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 23), "I2C3 clock not enabled (APB1ENR bit 23)");
 
-	I2C_PeriClockControl(I2C2, DISABLE);
+	I2C_PeriClockControl(I2C2, DRV_DISABLE);
 	CHECK(!(RCC->APB1ENR & (1U << 22)), "I2C2 clock not disabled");
 }
 
@@ -196,28 +196,28 @@ static void test_ack_after_enable(void) {
 	 * hardware when PE=0, so a value written before PE=1 may be lost. The
 	 * user of the driver expects ACK on once the peripheral runs. */
 	i2c_setup(&i2c1, I2C1, I2C_SCL_SPEED_SM, I2C_FM_DUTY_2, SLAVE_ADDR);
-	I2C_PeripheralControl(I2C1, ENABLE);
+	I2C_PeripheralControl(I2C1, DRV_ENABLE);
 
-	CHECK(I2C1->CR1 & (1U << I2C_CR1_PE),  "PE not set by PeripheralControl(ENABLE)");
-	CHECK(I2C1->CR1 & (1U << I2C_CR1_ACK), "Config.ACKControl=ENABLE, but ACK is 0 after enable "
+	CHECK(I2C1->CR1 & (1U << I2C_CR1_PE),  "PE not set by PeripheralControl(DRV_ENABLE)");
+	CHECK(I2C1->CR1 & (1U << I2C_CR1_ACK), "Config.ACKControl=DRV_ENABLE, but ACK is 0 after enable "
 	                                      "(ACK written while PE=0 is lost)");
 
-	I2C_PeripheralControl(I2C1, DISABLE);
-	CHECK(!(I2C1->CR1 & (1U << I2C_CR1_PE)), "PE not cleared by PeripheralControl(DISABLE)");
+	I2C_PeripheralControl(I2C1, DRV_DISABLE);
+	CHECK(!(I2C1->CR1 & (1U << I2C_CR1_PE)), "PE not cleared by PeripheralControl(DRV_DISABLE)");
 }
 
 static void test_manage_acking(void) {
 	i2c_setup(&i2c1, I2C1, I2C_SCL_SPEED_SM, I2C_FM_DUTY_2, SLAVE_ADDR);
-	I2C_PeripheralControl(I2C1, ENABLE);
+	I2C_PeripheralControl(I2C1, DRV_ENABLE);
 
 	I2C_ManageAcking(I2C1, I2C_ACK_ENABLE);
-	CHECK(I2C1->CR1 & (1U << I2C_CR1_ACK), "ManageAcking(ENABLE) did not set ACK");
+	CHECK(I2C1->CR1 & (1U << I2C_CR1_ACK), "ManageAcking(DRV_ENABLE) did not set ACK");
 
 	I2C_ManageAcking(I2C1, I2C_ACK_DISABLE);
-	CHECK(!(I2C1->CR1 & (1U << I2C_CR1_ACK)), "ManageAcking(DISABLE) did not clear ACK");
+	CHECK(!(I2C1->CR1 & (1U << I2C_CR1_ACK)), "ManageAcking(DRV_DISABLE) did not clear ACK");
 	CHECK(I2C1->CR1 & (1U << I2C_CR1_PE),      "ManageAcking changed PE");
 
-	I2C_PeripheralControl(I2C1, DISABLE);
+	I2C_PeripheralControl(I2C1, DRV_DISABLE);
 }
 
 static void test_nvic_config(void) {
@@ -225,13 +225,13 @@ static void test_nvic_config(void) {
 	static const uint8_t irqs[] = { IRQ_NO_I2C1_EV, IRQ_NO_I2C1_ER, IRQ_NO_I2C3_EV, IRQ_NO_I2C3_ER };
 
 	for (uint32_t i = 0; i < sizeof(irqs); i++) {
-		I2C_IRQInterruptConfig(irqs[i], ENABLE);
+		I2C_IRQInterruptConfig(irqs[i], DRV_ENABLE);
 		CHECK(test_nvic_is_enabled(irqs[i]), "I2C IRQ not enabled in NVIC");
 
 		I2C_IRQPriorityConfig(irqs[i], NVIC_IRQ_PRI10);
 		CHECK(test_nvic_priority(irqs[i]) == NVIC_IRQ_PRI10, "I2C IRQ priority not 10");
 
-		I2C_IRQInterruptConfig(irqs[i], DISABLE);
+		I2C_IRQInterruptConfig(irqs[i], DRV_DISABLE);
 		CHECK(!test_nvic_is_enabled(irqs[i]), "I2C IRQ not disabled in NVIC");
 	}
 }
@@ -257,8 +257,8 @@ static int loop_setup(void) {
 	i2c_setup(&i2c1, I2C1, I2C_SCL_SPEED_SM, I2C_FM_DUTY_2, MASTER_OWN_ADDR);
 	i2c_setup(&i2c3, I2C3, I2C_SCL_SPEED_SM, I2C_FM_DUTY_2, SLAVE_ADDR);
 
-	I2C_PeripheralControl(I2C1, ENABLE);
-	I2C_PeripheralControl(I2C3, ENABLE);
+	I2C_PeripheralControl(I2C1, DRV_ENABLE);
+	I2C_PeripheralControl(I2C3, DRV_ENABLE);
 
 	/* ACK set again after PE=1, so the transfer tests do not depend on the
 	 * i2c_ack_after_enable result. That test reports the ACK problem alone. */
@@ -273,10 +273,10 @@ static int loop_setup(void) {
 	I2C_IRQPriorityConfig(IRQ_NO_I2C1_ER, NVIC_IRQ_PRI10);
 	I2C_IRQPriorityConfig(IRQ_NO_I2C3_EV, NVIC_IRQ_PRI9);
 	I2C_IRQPriorityConfig(IRQ_NO_I2C3_ER, NVIC_IRQ_PRI9);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, ENABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, ENABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C3_EV, ENABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C3_ER, ENABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, DRV_ENABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, DRV_ENABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C3_EV, DRV_ENABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C3_ER, DRV_ENABLE);
 
 	if (I2C_IsBusy(I2C1)) {
 		CHECK(0, "bus BUSY right after enable: SDA or SCL held low (pull-ups missing?)");
@@ -286,10 +286,10 @@ static int loop_setup(void) {
 }
 
 static void loop_teardown(void) {
-	I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, DISABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, DISABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C3_EV, DISABLE);
-	I2C_IRQInterruptConfig(IRQ_NO_I2C3_ER, DISABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C1_EV, DRV_DISABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C1_ER, DRV_DISABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C3_EV, DRV_DISABLE);
+	I2C_IRQInterruptConfig(IRQ_NO_I2C3_ER, DRV_DISABLE);
 	/* RCC reset also frees a bus that a half-finished transfer left stuck */
 	I2C_DeInit(I2C1);
 	I2C_DeInit(I2C3);
@@ -414,6 +414,6 @@ void test_suite_i2c(void) {
 
 	I2C_DeInit(I2C1);
 	I2C_DeInit(I2C3);
-	I2C_PeriClockControl(I2C1, DISABLE);
-	I2C_PeriClockControl(I2C3, DISABLE);
+	I2C_PeriClockControl(I2C1, DRV_DISABLE);
+	I2C_PeriClockControl(I2C3, DRV_DISABLE);
 }

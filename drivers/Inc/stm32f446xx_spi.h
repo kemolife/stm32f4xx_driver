@@ -131,9 +131,9 @@ typedef struct {
 /**
  * @brief  Enables or Disables peripheral clock for the given SPI peripheral
  * @param  pSPIx: Base address of the SPI peripheral (SPI1, SPI2, etc.)
- * @param  EnorDi: Enable (ENABLE) or Disable (DISABLE) macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi);
+void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, DRV_State_t State);
 
 /**
  * @brief  Initializes the SPI peripheral according to configuration parameters
@@ -166,9 +166,9 @@ void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len);
 /**
  * @brief  Configures the NVIC interrupt controller settings for SPI interrupts
  * @param  IRQNumber: Interrupt Request Number associated with the SPI peripheral
- * @param  EnorDi: Enable or Disable interrupt macro
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void SPI_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
+void SPI_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State);
 
 /**
  * @brief  Configures the execution priority level for the specific SPI interrupt line
@@ -186,9 +186,9 @@ void SPI_IRQHandling(SPI_Handle_t *pSPIHandle);
 /**
  * @brief  Enables or disables the SPI peripheral (CR1 SPE bit)
  * @param  pSPIx: Base address of the SPI peripheral
- * @param  EnorDi: ENABLE or DISABLE macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi);
+void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, DRV_State_t State);
 
 /**
  * @brief  Reports whether the SPI is still shifting a frame

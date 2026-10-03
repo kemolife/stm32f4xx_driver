@@ -45,7 +45,7 @@ static void UART_GPIO_ConfigInit(void) {
 	gpioUART.Config.PuPdControl = GPIO_PIN_PU;   // UART line idles high
 	gpioUART.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 
 	// TX -> ST-LINK virtual COM port
 	gpioUART.Config.PinNumber = 2;
@@ -68,7 +68,7 @@ static void UART_ConfigInit(void) {
 	uart2Handle.Config.HWFlowControl = UART_HW_FLOW_CTRL_NONE;
 	uart2Handle.Config.OverSampling = UART_OVERSAMPLING_16;
 
-	UART_PeriClockControl(USART2, ENABLE);
+	UART_PeriClockControl(USART2, DRV_ENABLE);
 	UART_Init(&uart2Handle);
 }
 
@@ -83,7 +83,7 @@ static void GPIO_ButtonInit(void) {
 	gpioButton.Config.PuPdControl = GPIO_PIN_PU;
 	gpioButton.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioButton);
 }
 
@@ -95,7 +95,7 @@ int main(void) {
 	UART_ConfigInit();
 	GPIO_ButtonInit();
 
-	UART_PeripheralControl(USART2, ENABLE);
+	UART_PeripheralControl(USART2, DRV_ENABLE);
 
 	// Banner right after reset, so you can see the link works before pressing
 	const char *banner = "\r\nuart_tx ready, press B1\r\n";

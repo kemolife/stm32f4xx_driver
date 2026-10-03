@@ -26,10 +26,10 @@
 /**
  * @brief  Enables or disables one interrupt line in the NVIC
  * @param  IRQNumber: IRQ number, one of the IRQ_NO_* macros (0 .. 96)
- * @param  EnorDi: ENABLE or DISABLE
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  * @note   Numbers outside 0 .. 96 are ignored
  */
-void NVIC_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
+void NVIC_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State);
 
 /**
  * @brief  Sets the priority of one interrupt line

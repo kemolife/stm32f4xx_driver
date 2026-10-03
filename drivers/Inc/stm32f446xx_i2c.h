@@ -89,9 +89,9 @@ typedef struct {
 /**
  * @brief  Enables or Disables peripheral clock for the given I2C peripheral
  * @param  pI2Cx: Base address of the I2C peripheral (I2C1, I2C2, I2C3)
- * @param  EnorDi: Enable (ENABLE) or Disable (DISABLE) macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void I2C_PeriClockControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi);
+void I2C_PeriClockControl(I2C_RegDef_t *pI2Cx, DRV_State_t State);
 
 /**
  * @brief  Initializes the I2C peripheral according to configuration parameters
@@ -128,9 +128,9 @@ void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_
 /**
  * @brief  Configures the NVIC interrupt controller settings for I2C interrupts
  * @param  IRQNumber: Interrupt Request Number associated with the I2C peripheral
- * @param  EnorDi: Enable or Disable interrupt macro
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void I2C_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
+void I2C_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State);
 
 /**
  * @brief  Configures the execution priority level for the specific I2C interrupt line
@@ -154,10 +154,10 @@ void I2C_ER_IRQHandling(I2C_Handle_t *pI2CHandle);
 /**
  * @brief  Enables or disables the I2C peripheral (CR1 PE bit)
  * @param  pI2Cx: Base address of the I2C peripheral
- * @param  EnorDi: ENABLE or DISABLE macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  * @note   Call after I2C_Init: FREQ, CCR and TRISE can only be written while PE is 0
  */
-void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi);
+void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, DRV_State_t State);
 
 /**
  * @brief  Reports whether any transfer is in progress on the bus (SR2 BUSY)
@@ -169,9 +169,9 @@ int I2C_IsBusy(I2C_RegDef_t *pI2Cx);
 /**
  * @brief  Enables or disables automatic acknowledging on the given I2C peripheral
  * @param  pI2Cx: Base address of the I2C peripheral
- * @param  EnorDi: I2C_ACK_ENABLE or I2C_ACK_DISABLE
+ * @param  AckControl: I2C_ACK_ENABLE or I2C_ACK_DISABLE
  */
-void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t EnorDi);
+void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t AckControl);
 
 /**
  * @brief  Starts an interrupt driven write to a slave as bus master

@@ -23,7 +23,7 @@ int main(void) {
 	gpioLed.Config.PuPdControl = GPIO_PIN_PU;
 	gpioLed.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 	GPIO_Init(&gpioLed);
 
 	while (1) {

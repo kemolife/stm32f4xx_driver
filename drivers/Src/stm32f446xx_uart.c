@@ -25,22 +25,22 @@ static void UART_HandleRXNEInterrupt(UART_Handle_t *pUARTHandle);
  * @brief              - This function enables or disables peripheral clock for the given UARTx
  *
  * @param[in]          - base address of the uart peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - USART1 and USART6 sit on APB2, the other four on APB1
  *
  ******************************************************************************************/
-void UART_PeriClockControl(UART_RegDef_t *pUARTx, uint8_t EnorDi) {
-	/* 1. If EnorDi == ENABLE, compare pUARTx against USART1, USART2, USART3,
+void UART_PeriClockControl(UART_RegDef_t *pUARTx, DRV_State_t State) {
+	/* 1. If State == DRV_ENABLE, compare pUARTx against USART1, USART2, USART3,
 	 *    UART4, UART5, USART6 and call the matching *_PCLK_EN() macro.
 	 * 2. Otherwise call the matching *_PCLK_DI() macro.
 	 * 3. An unknown pointer must do nothing (no default branch that touches RCC). */
 
 	/* TODO: implement */
 	(void)pUARTx;
-	(void)EnorDi;
+	(void)State;
 }
 
 /******************************************************************************************
@@ -52,7 +52,7 @@ void UART_PeriClockControl(UART_RegDef_t *pUARTx, uint8_t EnorDi) {
  *
  * @return             - none
  *
- * @Note               - call this while UE is 0, before UART_PeripheralControl(..., ENABLE).
+ * @Note               - call this while UE is 0, before UART_PeripheralControl(..., DRV_ENABLE).
  *                       The peripheral clock must already be on
  *
  ******************************************************************************************/
@@ -119,20 +119,20 @@ void UART_DeInit(UART_RegDef_t *pUARTx) {
  * @brief              - Enables or disables the UART peripheral (CR1 UE bit)
  *
  * @param[in]          - base address of the UART peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - before disabling, wait for TC=1 so the last frame is not cut
  *
  ******************************************************************************************/
-void UART_PeripheralControl(UART_RegDef_t *pUARTx, uint8_t EnorDi) {
-	/* 1. ENABLE  -> CR1 |=  (1 << USART_CR1_UE)
-	 * 2. DISABLE -> CR1 &= ~(1 << USART_CR1_UE) */
+void UART_PeripheralControl(UART_RegDef_t *pUARTx, DRV_State_t State) {
+	/* 1. DRV_ENABLE  -> CR1 |=  (1 << USART_CR1_UE)
+	 * 2. DRV_DISABLE -> CR1 &= ~(1 << USART_CR1_UE) */
 
 	/* TODO: implement */
 	(void)pUARTx;
-	(void)EnorDi;
+	(void)State;
 }
 
 /******************************************************************************************
@@ -359,21 +359,21 @@ uint8_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint3
  * @brief              - Enables or disables the interrupt processing for a given IRQ number in NVIC
  *
  * @param[in]          - IRQ number to configure
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - UART IRQs are 37..39, 52, 53 and 71
  *
  ******************************************************************************************/
-void UART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	/* 1. One line: call NVIC_IRQInterruptConfig(IRQNumber, EnorDi).
+void UART_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State) {
+	/* 1. One line: call NVIC_IRQInterruptConfig(IRQNumber, State).
 	 *    The NVIC logic lives in stm32f446xx_nvic.c for every driver,
 	 *    see GPIO_IRQInterruptConfig for the same wrapper. */
 
 	/* TODO: implement */
 	(void)IRQNumber;
-	(void)EnorDi;
+	(void)State;
 }
 
 /******************************************************************************************

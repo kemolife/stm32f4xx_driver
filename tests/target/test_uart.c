@@ -72,7 +72,7 @@ static void uart1_gpio_init(void) {
 	pin.Config.PuPdControl = GPIO_PIN_PU;  // idle line is high
 	pin.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 
 	pin.Config.PinNumber = 9;    // USART1_TX (D8)
 	GPIO_Init(&pin);
@@ -83,7 +83,7 @@ static void uart1_gpio_init(void) {
 /* Clean start: reset, clock on, fresh handle, UART_Init. UE stays 0. */
 static void uart1_setup(uint8_t wordlen, uint8_t parity, uint8_t stopbits,
                         uint8_t flow, uint8_t oversampling, uint32_t baud) {
-	UART_PeriClockControl(USART1, ENABLE);
+	UART_PeriClockControl(USART1, DRV_ENABLE);
 	UART_DeInit(USART1);
 
 	memset(&uart1, 0, sizeof(uart1));
@@ -109,23 +109,23 @@ static void uart1_setup_8n1(void) {
 /* ========================================================================== */
 
 static void test_clock_control(void) {
-	UART_PeriClockControl(USART1, ENABLE);
+	UART_PeriClockControl(USART1, DRV_ENABLE);
 	CHECK(RCC->APB2ENR & (1U << 4), "USART1 clock not enabled (APB2ENR bit 4)");
-	UART_PeriClockControl(USART1, DISABLE);
+	UART_PeriClockControl(USART1, DRV_DISABLE);
 	CHECK(!(RCC->APB2ENR & (1U << 4)), "USART1 clock not disabled");
 
-	UART_PeriClockControl(USART2, ENABLE);
+	UART_PeriClockControl(USART2, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 17), "USART2 clock not enabled (APB1ENR bit 17)");
-	UART_PeriClockControl(USART2, DISABLE);
+	UART_PeriClockControl(USART2, DRV_DISABLE);
 	CHECK(!(RCC->APB1ENR & (1U << 17)), "USART2 clock not disabled");
 
-	UART_PeriClockControl(UART4, ENABLE);
+	UART_PeriClockControl(UART4, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 19), "UART4 clock not enabled (APB1ENR bit 19)");
-	UART_PeriClockControl(UART4, DISABLE);
+	UART_PeriClockControl(UART4, DRV_DISABLE);
 
-	UART_PeriClockControl(USART6, ENABLE);
+	UART_PeriClockControl(USART6, DRV_ENABLE);
 	CHECK(RCC->APB2ENR & (1U << 5), "USART6 clock not enabled (APB2ENR bit 5)");
-	UART_PeriClockControl(USART6, DISABLE);
+	UART_PeriClockControl(USART6, DRV_DISABLE);
 }
 
 static void test_deinit(void) {
@@ -222,17 +222,17 @@ static void test_baud_rate_golden_values(void) {
 static void test_peripheral_control(void) {
 	uart1_setup_8n1();
 
-	UART_PeripheralControl(USART1, ENABLE);
-	CHECK(USART1->CR1 & (1U << USART_CR1_UE), "UE not set by PeripheralControl(ENABLE)");
+	UART_PeripheralControl(USART1, DRV_ENABLE);
+	CHECK(USART1->CR1 & (1U << USART_CR1_UE), "UE not set by PeripheralControl(DRV_ENABLE)");
 
-	UART_PeripheralControl(USART1, DISABLE);
-	CHECK(!(USART1->CR1 & (1U << USART_CR1_UE)), "UE not cleared by PeripheralControl(DISABLE)");
+	UART_PeripheralControl(USART1, DRV_DISABLE);
+	CHECK(!(USART1->CR1 & (1U << USART_CR1_UE)), "UE not cleared by PeripheralControl(DRV_DISABLE)");
 	CHECK(USART1->CR1 & (1U << USART_CR1_TE), "PeripheralControl changed other CR1 bits");
 }
 
 static void test_flag_status_and_clear(void) {
 	uart1_setup_8n1();
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 
 	/* After reset TXE = 1 and TC = 1 (SR reset value 0x00C0) */
 	CHECK(UART_GetFlagStatus(USART1, UART_FLAG_TXE) == UART_FLAG_SET,    "TXE should be SET when idle");
@@ -244,20 +244,20 @@ static void test_flag_status_and_clear(void) {
 	CHECK(UART_GetFlagStatus(USART1, UART_FLAG_TC) == UART_FLAG_RESET, "TC not cleared by UART_ClearFlag");
 	CHECK(UART_GetFlagStatus(USART1, UART_FLAG_TXE) == UART_FLAG_SET,  "UART_ClearFlag(TC) touched TXE");
 
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_nvic_config(void) {
 	static const uint8_t irqs[] = { IRQ_NO_USART1, IRQ_NO_UART4, IRQ_NO_USART6 };
 
 	for (uint32_t i = 0; i < sizeof(irqs); i++) {
-		UART_IRQInterruptConfig(irqs[i], ENABLE);
+		UART_IRQInterruptConfig(irqs[i], DRV_ENABLE);
 		CHECK(test_nvic_is_enabled(irqs[i]), "UART IRQ not enabled in NVIC");
 
 		UART_IRQPriorityConfig(irqs[i], NVIC_IRQ_PRI12);
 		CHECK(test_nvic_priority(irqs[i]) == NVIC_IRQ_PRI12, "UART IRQ priority not 12");
 
-		UART_IRQInterruptConfig(irqs[i], DISABLE);
+		UART_IRQInterruptConfig(irqs[i], DRV_DISABLE);
 		CHECK(!test_nvic_is_enabled(irqs[i]), "UART IRQ not disabled in NVIC");
 	}
 }
@@ -285,7 +285,7 @@ static void test_loop_polling_8n1(void) {
 	}
 
 	uart1_setup_8n1();
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
@@ -302,7 +302,7 @@ static void test_loop_polling_8n1(void) {
 	/* SendData must return only after TC = 1 */
 	CHECK(USART1->SR & (1U << USART_SR_TC), "TC not set after UART_SendData returned");
 
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_loop_polling_9bit(void) {
@@ -316,7 +316,7 @@ static void test_loop_polling_9bit(void) {
 
 	uart1_setup(UART_WORDLEN_9BITS, UART_PARITY_DISABLE, UART_STOPBITS_1,
 	            UART_HW_FLOW_CTRL_NONE, UART_OVERSAMPLING_16, UART_STD_BAUD_115200);
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern) / sizeof(pattern[0]); i++) {
@@ -331,7 +331,7 @@ static void test_loop_polling_9bit(void) {
 		CHECK(rx == pattern[i], "9-bit frame differs, check the 0x01FF mask and uint16_t handling");
 	}
 
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_loop_polling_parity(void) {
@@ -346,7 +346,7 @@ static void test_loop_polling_parity(void) {
 
 	uart1_setup(UART_WORDLEN_8BITS, UART_PARITY_EN_EVEN, UART_STOPBITS_1,
 	            UART_HW_FLOW_CTRL_NONE, UART_OVERSAMPLING_16, UART_STD_BAUD_115200);
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
@@ -361,7 +361,7 @@ static void test_loop_polling_parity(void) {
 		CHECK(rx == pattern[i], "byte differs with parity, check the 0x7F mask");
 	}
 
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_loop_overrun_flag(void) {
@@ -373,7 +373,7 @@ static void test_loop_overrun_flag(void) {
 	}
 
 	uart1_setup_8n1();
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	UART_SendData(&uart1, data, sizeof(data));
@@ -384,7 +384,7 @@ static void test_loop_overrun_flag(void) {
 	drain_rx_raw(USART1);
 	CHECK(UART_GetFlagStatus(USART1, UART_FLAG_ORE) == UART_FLAG_RESET, "ORE still set after read SR -> read DR");
 
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_loop_interrupt_txrx(void) {
@@ -400,8 +400,8 @@ static void test_loop_interrupt_txrx(void) {
 
 	uart1_setup_8n1();
 	UART_IRQPriorityConfig(IRQ_NO_USART1, NVIC_IRQ_PRI12);
-	UART_IRQInterruptConfig(IRQ_NO_USART1, ENABLE);
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_IRQInterruptConfig(IRQ_NO_USART1, DRV_ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	/* Arm RX first so the first looped-back byte is not missed */
@@ -422,8 +422,8 @@ static void test_loop_interrupt_txrx(void) {
 	CHECK(!(USART1->CR1 & (1U << USART_CR1_TCIE)),   "TCIE left on after TX complete");
 	CHECK(!(USART1->CR1 & (1U << USART_CR1_RXNEIE)), "RXNEIE left on after RX complete");
 
-	UART_IRQInterruptConfig(IRQ_NO_USART1, DISABLE);
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_IRQInterruptConfig(IRQ_NO_USART1, DRV_DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 static void test_loop_interrupt_busy_rejection(void) {
@@ -438,8 +438,8 @@ static void test_loop_interrupt_busy_rejection(void) {
 	reset_events();
 
 	uart1_setup_8n1();
-	UART_IRQInterruptConfig(IRQ_NO_USART1, ENABLE);
-	UART_PeripheralControl(USART1, ENABLE);
+	UART_IRQInterruptConfig(IRQ_NO_USART1, DRV_ENABLE);
+	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
 	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(rx)) == UART_READY,      "first ReceiveDataIT rejected");
@@ -456,8 +456,8 @@ static void test_loop_interrupt_busy_rejection(void) {
 	CHECK(UART_SendDataIT(&uart1, tx, 1) == UART_READY, "SendDataIT rejected after TX complete");
 	CHECK(test_wait_count(&tx_cmplt_count, 2, TEST_TIMEOUT_MS), "second TX never completed");
 
-	UART_IRQInterruptConfig(IRQ_NO_USART1, DISABLE);
-	UART_PeripheralControl(USART1, DISABLE);
+	UART_IRQInterruptConfig(IRQ_NO_USART1, DRV_DISABLE);
+	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
 void test_suite_uart(void) {
@@ -481,5 +481,5 @@ void test_suite_uart(void) {
 	test_run(test_loop_interrupt_busy_rejection, "uart_loop_interrupt_busy_rejection");
 
 	UART_DeInit(USART1);
-	UART_PeriClockControl(USART1, DISABLE);
+	UART_PeriClockControl(USART1, DRV_DISABLE);
 }

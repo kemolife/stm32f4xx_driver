@@ -57,7 +57,7 @@ static void GPIO_LedInit(void) {
 	gpioLed.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioLed.Config.Speed = GPIO_SPEED_LOW;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 	GPIO_Init(&gpioLed);
 }
 
@@ -75,7 +75,7 @@ static void MCO2_Init(void) {
 	gpioMco.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioMco.Config.Speed = GPIO_SPEED_HIGH;          // 36 MHz edge needs the fast driver
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioMco);
 
 	/* MCO2 source 00 = SYSCLK, prescaler 111 = /5 */

@@ -18,15 +18,15 @@ static void spi_ovr_interrupt_handle(SPI_Handle_t *pSPIHandle);
  * @brief              - This function enables or disables peripheral clock for the given SPIx
  *
  * @param[in]          - base address of the spi peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - none
  *
  ******************************************************************************************/
-void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi) {
-	if (EnorDi == ENABLE) {
+void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, DRV_State_t State) {
+	if (State == DRV_ENABLE) {
 		if (pSPIx == SPI1) {
 			SPI1_PCLK_EN();
 		} else if (pSPIx == SPI2) {
@@ -59,7 +59,7 @@ void SPI_PeriClockControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi) {
  * @return             - none
  *
  * @Note               - writes the whole CR1, so call it while SPE is 0, before
- *                       SPI_PeripheralControl(..., ENABLE). The clock must already be on
+ *                       SPI_PeripheralControl(..., DRV_ENABLE). The clock must already be on
  *
  ******************************************************************************************/
 void SPI_Init(SPI_Handle_t *pSPIHandle){
@@ -118,7 +118,7 @@ void SPI_Init(SPI_Handle_t *pSPIHandle){
  * @brief              - Enables or disables the SPI peripheral (CR1 SPE bit)
  *
  * @param[in]          - base address of the SPI peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
@@ -126,8 +126,8 @@ void SPI_Init(SPI_Handle_t *pSPIHandle){
  *                       SPI_IsBusy() returns 0, or the last frame is cut
  *
  ******************************************************************************************/
-void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, uint8_t EnorDi) {
-	if (EnorDi == ENABLE) {
+void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, DRV_State_t State) {
+	if (State == DRV_ENABLE) {
 		pSPIx->CR1 |= (1U << SPI_CR1_SPE);
 	} else {
 		pSPIx->CR1 &= ~(1U << SPI_CR1_SPE);
@@ -267,15 +267,15 @@ void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
  * @brief              - Enables or disables the SPI interrupt line in the NVIC
  *
  * @param[in]          - IRQ number, one of the IRQ_NO_* macros
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - same as NVIC_IRQInterruptConfig, kept so the SPI API is complete
  *
  ******************************************************************************************/
-void SPI_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
+void SPI_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State) {
+	NVIC_IRQInterruptConfig(IRQNumber, State);
 }
 
 /******************************************************************************************

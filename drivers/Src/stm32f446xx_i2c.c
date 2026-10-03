@@ -45,15 +45,15 @@ static void clear_ADDR(I2C_Handle_t *pI2CHandle) {
  * @brief              - This function enables or disables peripheral clock for the given I2Cx
  *
  * @param[in]          - base address of the i2c peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - the clock must be enabled before any other register is touched
  *
  ******************************************************************************************/
-void I2C_PeriClockControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi) {
-    if (EnorDi == ENABLE) {
+void I2C_PeriClockControl(I2C_RegDef_t *pI2Cx, DRV_State_t State) {
+    if (State == DRV_ENABLE) {
         if (pI2Cx == I2C1) {
             I2C1_PCLK_EN();
         } else if (pI2Cx == I2C2) {
@@ -82,7 +82,7 @@ void I2C_PeriClockControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi) {
  * @return             - none
  *
  * @Note               - FREQ, CCR and TRISE are only writable while PE is 0, so call this
- *                       before I2C_PeripheralControl(..., ENABLE)
+ *                       before I2C_PeripheralControl(..., DRV_ENABLE)
  *
  ******************************************************************************************/
 void I2C_Init(I2C_Handle_t *pI2CHandle) {
@@ -318,7 +318,7 @@ void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_
  * @brief              - Enables or disables the I2C peripheral (CR1 PE bit)
  *
  * @param[in]          - base address of the I2C peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
@@ -326,8 +326,8 @@ void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_
  *                       only be programmed while PE is 0
  *
  ******************************************************************************************/
-void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, uint8_t EnorDi) {
-	if (EnorDi == ENABLE) {
+void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, DRV_State_t State) {
+	if (State == DRV_ENABLE) {
 		pI2Cx->CR1 |= (1U << I2C_CR1_PE);
 	} else {
 		pI2Cx->CR1 &= ~(1U << I2C_CR1_PE);
@@ -365,9 +365,9 @@ int I2C_IsBusy(I2C_RegDef_t *pI2Cx) {
  *                       clears ACK while PE is 0, so call this after PE is set
  *
  ******************************************************************************************/
-void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t EnorDi) {
+void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t AckControl) {
     // ACK lives in CR1 bit 10. SR1 is status only and must never be used here.
-    if (EnorDi == I2C_ACK_ENABLE) {
+    if (AckControl == I2C_ACK_ENABLE) {
         pI2Cx->CR1 |= (1U << I2C_CR1_ACK);
     } else {
         pI2Cx->CR1 &= ~(1U << I2C_CR1_ACK);
@@ -495,15 +495,15 @@ uint8_t I2C_SlaveReceiveData(I2C_RegDef_t *pI2Cx) {
  * @brief              - Enables or disables the I2C interrupt line in the NVIC
  *
  * @param[in]          - IRQ number, one of the IRQ_NO_* macros
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - same as NVIC_IRQInterruptConfig, kept so the I2C API is complete
  *
  ******************************************************************************************/
-void I2C_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
+void I2C_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State) {
+	NVIC_IRQInterruptConfig(IRQNumber, State);
 }
 
 /******************************************************************************************

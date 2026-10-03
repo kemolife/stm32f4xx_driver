@@ -42,7 +42,7 @@ static void SPI_GPIO_ConfigInit(void) {
 	gpioSPI.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioSPI.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOB, ENABLE);
+	GPIO_PeriClockControl(GPIOB, DRV_ENABLE);
 
 	// MOSI -> Pico GPIO12 (SPI1 RX)
 	gpioSPI.Config.PinNumber = 15;
@@ -72,7 +72,7 @@ static void SPI_ConfigInit(void) {
 	                                                 // burst under one CS assertion
 	SPI_Handle.Config.SSM = SPI_SSM_DI;      // hardware NSS (SSOE)
 
-	SPI_PeriClockControl(SPI2, ENABLE);
+	SPI_PeriClockControl(SPI2, DRV_ENABLE);
 	SPI_Init(&SPI_Handle);
 }
 
@@ -87,7 +87,7 @@ static void GPIO_ButtonInit(void) {
 	gpioButton.Config.PuPdControl = GPIO_PIN_PU;
 	gpioButton.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioButton);
 }
 
@@ -97,7 +97,7 @@ int main(void) {
 	GPIO_ButtonInit();
 
 	// Move the Peripheral Enable OUTSIDE the loop so it stays active
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
 	while(1) {
 		// 1. Wait for button press (assuming active-LOW button)

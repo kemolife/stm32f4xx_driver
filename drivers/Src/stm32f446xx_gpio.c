@@ -13,15 +13,15 @@
  * @brief              - This function enables or disables peripheral clock for the given GPIO port
  *
  * @param[in]          - base address of the gpio peripheral
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - none
  *
  ******************************************************************************************/
-void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, uint8_t EnorDi){
-	if (EnorDi == ENABLE) {
+void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, DRV_State_t State){
+	if (State == DRV_ENABLE) {
 		if (pGPIOx == GPIOA) {
 			GPIOA_PCLK_EN();
 		} else if (pGPIOx == GPIOB) {
@@ -300,15 +300,15 @@ void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber){
  * @brief              - Enables or disables the GPIO interrupt line in the NVIC
  *
  * @param[in]          - IRQ number, one of the IRQ_NO_* macros
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
  * @Note               - same as NVIC_IRQInterruptConfig, kept so the GPIO API is complete
  *
  ******************************************************************************************/
-void GPIO_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
-	NVIC_IRQInterruptConfig(IRQNumber, EnorDi);
+void GPIO_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State) {
+	NVIC_IRQInterruptConfig(IRQNumber, State);
 }
 
 /******************************************************************************************

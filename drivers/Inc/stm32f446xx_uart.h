@@ -141,9 +141,9 @@ typedef struct {
 /**
  * @brief  Enables or Disables peripheral clock for the given USART/UART peripheral
  * @param  pUARTx: Base address of the peripheral (USART1, USART2, USART3, UART4, UART5, USART6)
- * @param  EnorDi: Enable (ENABLE) or Disable (DISABLE) macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void UART_PeriClockControl(UART_RegDef_t *pUARTx, uint8_t EnorDi);
+void UART_PeriClockControl(UART_RegDef_t *pUARTx, DRV_State_t State);
 
 /**
  * @brief  Initializes the UART peripheral according to configuration parameters
@@ -160,9 +160,9 @@ void UART_DeInit(UART_RegDef_t *pUARTx);
 /**
  * @brief  Enables or disables the UART peripheral (CR1 UE bit)
  * @param  pUARTx: Base address of the UART peripheral
- * @param  EnorDi: ENABLE or DISABLE macros
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void UART_PeripheralControl(UART_RegDef_t *pUARTx, uint8_t EnorDi);
+void UART_PeripheralControl(UART_RegDef_t *pUARTx, DRV_State_t State);
 
 /**
  * @brief  Programs BRR for the requested baud rate from the current bus clock
@@ -217,9 +217,9 @@ uint8_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint3
 /**
  * @brief  Configures the NVIC interrupt controller settings for UART interrupts
  * @param  IRQNumber: Interrupt Request Number associated with the UART peripheral
- * @param  EnorDi: Enable or Disable interrupt macro
+ * @param  State: DRV_ENABLE or DRV_DISABLE
  */
-void UART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
+void UART_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State);
 
 /**
  * @brief  Configures the execution priority level for the specific UART interrupt line

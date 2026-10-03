@@ -105,16 +105,16 @@ spi.Config.CPOL       = SPI_CPOL_LOW;
 spi.Config.CPHA       = SPI_CPHA_LOW;
 spi.Config.SSM        = SPI_SSM_EN;
 
-SPI_PeriClockControl(SPI2, ENABLE);    // 1. clock on
+SPI_PeriClockControl(SPI2, DRV_ENABLE);    // 1. clock on
 SPI_Init(&spi);                        // 2. configure (peripheral still off)
-SPI_PeripheralControl(SPI2, ENABLE);   // 3. switch on
+SPI_PeripheralControl(SPI2, DRV_ENABLE);   // 3. switch on
 SPI_SendData(SPI2, data, len);         // 4. use
 ```
 
 The pins are configured separately with the GPIO driver (alternate function
 mode and AF number from the datasheet).
 
-**Interrupts:** enable the line with `XXX_IRQInterruptConfig(IRQ_NO_..., ENABLE)`,
+**Interrupts:** enable the line with `XXX_IRQInterruptConfig(IRQ_NO_..., DRV_ENABLE)`,
 call `XXX_IRQHandling(&handle)` from the vector (for example `SPI2_IRQHandler`),
 and override the weak `XXX_ApplicationEventCallback` to get completion and error
 events.
@@ -125,6 +125,8 @@ events.
   (`SPI_Init`, `SPI_Handle_t`, `SPI_DFF_8BITS`). Struct members do not
   (`Config.DFF`).
 - **Handles:** `Instance` is the register base, `Config` holds the settings.
+- **On/off arguments:** type `DRV_State_t`, values `DRV_ENABLE` / `DRV_DISABLE`
+  (prefixed, so they cannot clash with other libraries).
 - **Register bits:** use the bit position macros (`SPI_CR1_SPE`), never a raw
   number.
 - **Comments:** every public function has a doc block. Comments explain *why*

@@ -13,7 +13,7 @@
  * @brief              - Enables or disables one interrupt line in the NVIC
  *
  * @param[in]          - IRQ number (0 .. 96)
- * @param[in]          - ENABLE or DISABLE macros
+ * @param[in]          - DRV_ENABLE or DRV_DISABLE
  *
  * @return             - none
  *
@@ -23,7 +23,7 @@
  *                       the fourth register (ISER3/ICER3)
  *
  ******************************************************************************************/
-void NVIC_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
+void NVIC_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State) {
 	if (IRQNumber >= NVIC_IRQ_COUNT) {
 		return;
 	}
@@ -31,7 +31,7 @@ void NVIC_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi) {
 	uint32_t reg = IRQNumber / 32U;
 	uint32_t bit = 1UL << (IRQNumber % 32U);
 
-	if (EnorDi == ENABLE) {
+	if (State == DRV_ENABLE) {
 		NVIC_ISER_BASE_ADDR[reg] = bit;
 	} else {
 		NVIC_ICER_BASE_ADDR[reg] = bit;

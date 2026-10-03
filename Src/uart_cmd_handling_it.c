@@ -70,7 +70,7 @@ static void UART_GPIO_ConfigInit(void) {
 	gpioUART.Config.PuPdControl = GPIO_PIN_PU;
 	gpioUART.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 
 	gpioUART.Config.PinNumber = 2;   // USART2_TX
 	GPIO_Init(&gpioUART);
@@ -91,11 +91,11 @@ static void UART_ConfigInit(void) {
 	uart2Handle.Config.HWFlowControl = UART_HW_FLOW_CTRL_NONE;
 	uart2Handle.Config.OverSampling = UART_OVERSAMPLING_16;
 
-	UART_PeriClockControl(USART2, ENABLE);
+	UART_PeriClockControl(USART2, DRV_ENABLE);
 	UART_Init(&uart2Handle);
 
 	UART_IRQPriorityConfig(IRQ_NO_USART2, NVIC_IRQ_PRI12);
-	UART_IRQInterruptConfig(IRQ_NO_USART2, ENABLE);
+	UART_IRQInterruptConfig(IRQ_NO_USART2, DRV_ENABLE);
 }
 
 static void GPIO_LedInit(void) {
@@ -110,7 +110,7 @@ static void GPIO_LedInit(void) {
 	gpioLed.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioLed.Config.Speed = GPIO_SPEED_LOW;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 	GPIO_Init(&gpioLed);
 }
 
@@ -199,7 +199,7 @@ int main(void) {
 	UART_GPIO_ConfigInit();
 	UART_ConfigInit();
 
-	UART_PeripheralControl(USART2, ENABLE);
+	UART_PeripheralControl(USART2, DRV_ENABLE);
 
 	send_it("\r\nuart_cmd_handling_it ready, type help\r\n> ");
 

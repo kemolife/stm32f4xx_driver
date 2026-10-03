@@ -22,7 +22,7 @@ static void SPI_GPIO_ConfigInit(void) {
 	gpioSPI.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioSPI.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOB, ENABLE);
+	GPIO_PeriClockControl(GPIOB, DRV_ENABLE);
 
 	// MOSI
 	gpioSPI.Config.PinNumber = 15;
@@ -47,7 +47,7 @@ static void SPI_ConfigInit(void) {
 	SPI_Handle.Config.CPOL = SPI_CPOL_LOW;
 	SPI_Handle.Config.SSM = SPI_SSM_EN;
 
-	SPI_PeriClockControl(SPI2, ENABLE);
+	SPI_PeriClockControl(SPI2, DRV_ENABLE);
 	SPI_Init(&SPI_Handle);
 }
 
@@ -55,7 +55,7 @@ int main(void) {
 	SPI_GPIO_ConfigInit();
 	SPI_ConfigInit();
 
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
 	uint8_t message[] = "HELLO";
 	SPI_SendData(SPI2, message, strlen((char*)message));
@@ -63,7 +63,7 @@ int main(void) {
 	// SendData returns when the last byte is queued; wait until it is on the wire
 	while (SPI_IsBusy(SPI2));
 
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 
 	while(1);
 	return 0;

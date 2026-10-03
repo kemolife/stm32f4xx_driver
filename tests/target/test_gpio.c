@@ -75,20 +75,20 @@ static void pin_reset_raw(uint8_t pin) {
 /* ========================================================================== */
 
 static void test_clock_control(void) {
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	CHECK(RCC->AHB1ENR & (1U << 2), "GPIOC clock not enabled (AHB1ENR bit 2)");
 
-	GPIO_PeriClockControl(GPIOH, ENABLE);
+	GPIO_PeriClockControl(GPIOH, DRV_ENABLE);
 	CHECK(RCC->AHB1ENR & (1U << 7), "GPIOH clock not enabled (AHB1ENR bit 7)");
 
-	GPIO_PeriClockControl(GPIOH, DISABLE);
+	GPIO_PeriClockControl(GPIOH, DRV_DISABLE);
 	CHECK(!(RCC->AHB1ENR & (1U << 7)), "GPIOH clock not disabled");
 }
 
 static void test_init_output_fields(void) {
 	GPIO_Handle_t h;
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	pin_reset_raw(REG_PIN);
 
 	/* Neighbours must not change: snapshot everything except PC8's fields */
@@ -205,7 +205,7 @@ static void test_input_pull_up_down(void) {
 static void test_deinit(void) {
 	/* GPIOH reset value of every register is 0. Only PUPDR/OSPEEDR are
 	 * written: PH0/PH1 are oscillator pins and must never be outputs. */
-	GPIO_PeriClockControl(GPIOH, ENABLE);
+	GPIO_PeriClockControl(GPIOH, DRV_ENABLE);
 	GPIOH->PUPDR = 0x5U;
 	GPIOH->OSPEEDR = 0xFU;
 
@@ -214,7 +214,7 @@ static void test_deinit(void) {
 	CHECK(GPIOH->PUPDR == 0U,   "GPIOH PUPDR not reset");
 	CHECK(GPIOH->OSPEEDR == 0U, "GPIOH OSPEEDR not reset");
 
-	GPIO_PeriClockControl(GPIOH, DISABLE);
+	GPIO_PeriClockControl(GPIOH, DRV_DISABLE);
 }
 
 static void test_exti_config(void) {
@@ -253,7 +253,7 @@ static void test_nvic_config(void) {
 	static const uint8_t irqs[] = { IRQ_NO_EXTI0, IRQ_NO_EXTI4, IRQ_NO_EXTI9_5, IRQ_NO_EXTI15_10 };
 
 	for (uint32_t i = 0; i < sizeof(irqs); i++) {
-		GPIO_IRQInterruptConfig(irqs[i], ENABLE);
+		GPIO_IRQInterruptConfig(irqs[i], DRV_ENABLE);
 		CHECK(test_nvic_is_enabled(irqs[i]), "EXTI IRQ not enabled in NVIC");
 
 		GPIO_IRQPriorityConfig(irqs[i], NVIC_IRQ_PRI13);
@@ -262,7 +262,7 @@ static void test_nvic_config(void) {
 		GPIO_IRQPriorityConfig(irqs[i], NVIC_IRQ_PRI2);
 		CHECK(test_nvic_priority(irqs[i]) == NVIC_IRQ_PRI2, "EXTI IRQ priority not replaced by 2");
 
-		GPIO_IRQInterruptConfig(irqs[i], DISABLE);
+		GPIO_IRQInterruptConfig(irqs[i], DRV_DISABLE);
 		CHECK(!test_nvic_is_enabled(irqs[i]), "EXTI IRQ not disabled in NVIC");
 	}
 }
@@ -276,7 +276,7 @@ static void test_exti_software_irq(void) {
 	exti6_count = 0;
 	EXTI->PR = (1U << EXTI_SW_PIN);   // start clean
 	GPIO_IRQPriorityConfig(IRQ_NO_EXTI9_5, NVIC_IRQ_PRI13);
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, ENABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DRV_ENABLE);
 
 	/* SWIER sets the pending bit as if an edge came in, no wire needed */
 	EXTI->SWIER = (1U << EXTI_SW_PIN);
@@ -286,7 +286,7 @@ static void test_exti_software_irq(void) {
 	test_delay_ms(1);
 	CHECK(exti6_count == 1, "IRQ fired more than once (pending bit not cleared?)");
 
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DISABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DRV_DISABLE);
 	EXTI->IMR &= ~(1U << EXTI_SW_PIN);
 	pin_reset_raw(EXTI_SW_PIN);
 }
@@ -351,7 +351,7 @@ static void test_loop_edge_interrupts(void) {
 	GPIO_Init(&out);
 
 	GPIO_IRQPriorityConfig(IRQ_NO_EXTI15_10, NVIC_IRQ_PRI13);
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI15_10, ENABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI15_10, DRV_ENABLE);
 
 	pin_config(&in, GPIOC, LOOP_IN_PIN, GPIO_MODE_IT_RT, GPIO_OP_TYPE_PP, GPIO_SPEED_LOW, GPIO_NOT_PUPD, 0);
 	GPIO_Init(&in);
@@ -365,7 +365,7 @@ static void test_loop_edge_interrupts(void) {
 	GPIO_Init(&in);
 	CHECK(pulse_and_count() == 2, "IT_RFT: expected 2 IRQs per pulse (both edges)");
 
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI15_10, DISABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI15_10, DRV_DISABLE);
 	EXTI->IMR &= ~(1U << LOOP_IN_PIN);
 	EXTI->RTSR &= ~(1U << LOOP_IN_PIN);
 	EXTI->FTSR &= ~(1U << LOOP_IN_PIN);

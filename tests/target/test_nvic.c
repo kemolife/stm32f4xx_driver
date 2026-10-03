@@ -31,9 +31,9 @@ static void test_enable_disable_edges(void) {
 
 	irq_mask_all();
 	for (uint32_t i = 0; i < sizeof(irqs); i++) {
-		NVIC_IRQInterruptConfig(irqs[i], ENABLE);
+		NVIC_IRQInterruptConfig(irqs[i], DRV_ENABLE);
 		int on = test_nvic_is_enabled(irqs[i]);
-		NVIC_IRQInterruptConfig(irqs[i], DISABLE);
+		NVIC_IRQInterruptConfig(irqs[i], DRV_DISABLE);
 		int off = !test_nvic_is_enabled(irqs[i]);
 
 		if (!on || !off) {
@@ -48,13 +48,13 @@ static void test_enable_disable_edges(void) {
 
 static void test_enable_touches_one_line(void) {
 	irq_mask_all();
-	NVIC_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);           // 36: ISER1 bit 4
+	NVIC_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);           // 36: ISER1 bit 4
 
 	CHECK(!test_nvic_is_enabled(IRQ_NO_SPI1), "enabling IRQ 36 also enabled IRQ 35");
 	CHECK(!test_nvic_is_enabled(IRQ_NO_USART1), "enabling IRQ 36 also enabled IRQ 37");
 	CHECK(!test_nvic_is_enabled(IRQ_NO_SPI2 - 32U), "enabling IRQ 36 also enabled IRQ 4 (wrong register)");
 
-	NVIC_IRQInterruptConfig(IRQ_NO_SPI2, DISABLE);
+	NVIC_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
 	clear_all_pending();
 	irq_unmask_all();
 }
@@ -100,7 +100,7 @@ static void test_invalid_input_ignored(void) {
 	CHECK(test_nvic_priority(40) == 6, "priority 16 was not ignored");
 
 	uint32_t iser3 = NVIC_ISER_BASE_ADDR[3];
-	NVIC_IRQInterruptConfig(NVIC_IRQ_COUNT, ENABLE);      // IRQ 97 does not exist
+	NVIC_IRQInterruptConfig(NVIC_IRQ_COUNT, DRV_ENABLE);      // IRQ 97 does not exist
 	CHECK(NVIC_ISER_BASE_ADDR[3] == iser3, "IRQ 97 was not ignored");
 
 	NVIC_IRQPriorityConfig(40, 0);

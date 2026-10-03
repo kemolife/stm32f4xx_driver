@@ -565,8 +565,14 @@ typedef struct {
 #define SYSCFG_PCLK_EN()    (RCC->APB2ENR |= (1 << 14))
 #define SYSCFG_PCLK_DI()    (RCC->APB2ENR &= ~(1 << 14))
 
-#define ENABLE   1
-#define DISABLE  0
+/**
+ * On/off argument of every XXX_PeriClockControl, XXX_PeripheralControl and
+ * XXX_IRQInterruptConfig function
+ */
+typedef enum {
+    DRV_DISABLE = 0,
+    DRV_ENABLE  = 1
+} DRV_State_t;
 
 #define IRQ_NO_EXTI0      6
 #define IRQ_NO_EXTI1      7

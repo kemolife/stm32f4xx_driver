@@ -73,7 +73,7 @@ typedef struct {
 /*
  * Peripheral Clock setup
  */
-void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, uint8_t EnorDi);
+void GPIO_PeriClockControl(GPIO_RegDef_t *pGPIOx, DRV_State_t State);
 
 /*
  * Init and De-init
@@ -93,7 +93,7 @@ void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber);
 /*
  * IRQ Configuration and ISR handling
  */
-void GPIO_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi);
+void GPIO_IRQInterruptConfig(uint8_t IRQNumber, DRV_State_t State);
 void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority);
 void GPIO_IRQHandling(uint8_t PinNumber);
 

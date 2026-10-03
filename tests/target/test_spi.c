@@ -57,7 +57,7 @@ static void spi2_gpio_init(void) {
 	pin.Config.PuPdControl = GPIO_NOT_PUPD;
 	pin.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOB, ENABLE);
+	GPIO_PeriClockControl(GPIOB, DRV_ENABLE);
 
 	pin.Config.PinNumber = 13;   // SCK
 	GPIO_Init(&pin);
@@ -69,7 +69,7 @@ static void spi2_gpio_init(void) {
 
 /* Clean start: reset, clock on, fresh handle, SPI_Init. SPE stays 0. */
 static void spi2_setup(uint8_t bus, uint8_t dff, uint8_t cpol, uint8_t cpha, uint8_t ssm) {
-	SPI_PeriClockControl(SPI2, ENABLE);
+	SPI_PeriClockControl(SPI2, DRV_ENABLE);
 	SPI_DeInit(SPI2);
 
 	memset(&spi2, 0, sizeof(spi2));
@@ -102,22 +102,22 @@ static void drain_rx_raw(void) {
 /* ========================================================================== */
 
 static void test_clock_control(void) {
-	SPI_PeriClockControl(SPI1, ENABLE);
+	SPI_PeriClockControl(SPI1, DRV_ENABLE);
 	CHECK(RCC->APB2ENR & (1U << 12), "SPI1 clock not enabled (APB2ENR bit 12)");
-	SPI_PeriClockControl(SPI1, DISABLE);
+	SPI_PeriClockControl(SPI1, DRV_DISABLE);
 	CHECK(!(RCC->APB2ENR & (1U << 12)), "SPI1 clock not disabled");
 
-	SPI_PeriClockControl(SPI2, ENABLE);
+	SPI_PeriClockControl(SPI2, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 14), "SPI2 clock not enabled (APB1ENR bit 14)");
 
-	SPI_PeriClockControl(SPI3, ENABLE);
+	SPI_PeriClockControl(SPI3, DRV_ENABLE);
 	CHECK(RCC->APB1ENR & (1U << 15), "SPI3 clock not enabled (APB1ENR bit 15)");
-	SPI_PeriClockControl(SPI3, DISABLE);
+	SPI_PeriClockControl(SPI3, DRV_DISABLE);
 	CHECK(!(RCC->APB1ENR & (1U << 15)), "SPI3 clock not disabled");
 
-	SPI_PeriClockControl(SPI4, ENABLE);
+	SPI_PeriClockControl(SPI4, DRV_ENABLE);
 	CHECK(RCC->APB2ENR & (1U << 13), "SPI4 clock not enabled (APB2ENR bit 13)");
-	SPI_PeriClockControl(SPI4, DISABLE);
+	SPI_PeriClockControl(SPI4, DRV_DISABLE);
 }
 
 static void test_deinit(void) {
@@ -169,21 +169,21 @@ static void test_init_hardware_nss(void) {
 static void test_peripheral_control(void) {
 	spi2_setup_default();
 
-	SPI_PeripheralControl(SPI2, ENABLE);
-	CHECK(SPI2->CR1 & (1U << SPI_CR1_SPE), "SPE not set by PeripheralControl(ENABLE)");
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
+	CHECK(SPI2->CR1 & (1U << SPI_CR1_SPE), "SPE not set by PeripheralControl(DRV_ENABLE)");
 
 	/* Real hardware check: a bad NSS setup raises MODF, which clears MSTR */
 	CHECK(!(SPI2->SR & (1U << SPI_SR_MODF)), "MODF raised after enable (NSS setup wrong)");
 	CHECK(SPI2->CR1 & (1U << SPI_CR1_MSTR),  "MSTR cleared by hardware (mode fault)");
 	CHECK(SPI_IsBusy(SPI2) == 0,             "SPI_IsBusy reports busy on an idle bus");
 
-	SPI_PeripheralControl(SPI2, DISABLE);
-	CHECK(!(SPI2->CR1 & (1U << SPI_CR1_SPE)), "SPE not cleared by PeripheralControl(DISABLE)");
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
+	CHECK(!(SPI2->CR1 & (1U << SPI_CR1_SPE)), "SPE not cleared by PeripheralControl(DRV_DISABLE)");
 }
 
 static void test_nvic_config(void) {
 	/* SPI2 = IRQ 36 -> ISER1 bit 4 */
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
 	CHECK(test_nvic_is_enabled(IRQ_NO_SPI2), "SPI2 IRQ not enabled in NVIC");
 
 	SPI_IRQPriorityConfig(IRQ_NO_SPI2, NVIC_IRQ_PRI11);
@@ -192,7 +192,7 @@ static void test_nvic_config(void) {
 	SPI_IRQPriorityConfig(IRQ_NO_SPI4, NVIC_IRQ_PRI9);
 	CHECK(test_nvic_priority(IRQ_NO_SPI4) == NVIC_IRQ_PRI9, "SPI4 (IRQ 84) priority not 9");
 
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DISABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
 	CHECK(!test_nvic_is_enabled(IRQ_NO_SPI2), "SPI2 IRQ not disabled in NVIC");
 }
 
@@ -219,7 +219,7 @@ static void test_loop_polling_8bit(void) {
 	}
 
 	spi2_setup_default();
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 	drain_rx_raw();
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
@@ -232,7 +232,7 @@ static void test_loop_polling_8bit(void) {
 	CHECK(test_wait_reg(&SPI2->SR, 1U << SPI_SR_BSY, 0, TEST_TIMEOUT_MS), "BSY did not clear");
 	CHECK(!(SPI2->SR & (1U << SPI_SR_OVR)), "OVR set during 1-by-1 transfer");
 
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 }
 
 static void test_loop_polling_16bit(void) {
@@ -245,7 +245,7 @@ static void test_loop_polling_16bit(void) {
 
 	/* DFF must be written while SPE = 0, so the setup comes before enable */
 	spi2_setup(SPI_BUS_CONFIG_FULL_DUPLEX, SPI_DFF_16BITS, SPI_CPOL_LOW, SPI_CPHA_LOW, SPI_SSM_EN);
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 	drain_rx_raw();
 
 	for (uint32_t i = 0; i < sizeof(pattern) / sizeof(pattern[0]); i++) {
@@ -261,7 +261,7 @@ static void test_loop_polling_16bit(void) {
 	test_delay_ms(1);
 	CHECK(!(SPI2->SR & (1U << SPI_SR_RXNE)), "odd length in 16-bit mode was sent");
 
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 }
 
 static void test_loop_all_modes(void) {
@@ -273,7 +273,7 @@ static void test_loop_all_modes(void) {
 		uint8_t tx = (uint8_t)(0x3C ^ mode), rx = 0;
 
 		spi2_setup(SPI_BUS_CONFIG_FULL_DUPLEX, SPI_DFF_8BITS, (mode >> 1) & 1U, mode & 1U, SPI_SSM_EN);
-		SPI_PeripheralControl(SPI2, ENABLE);
+		SPI_PeripheralControl(SPI2, DRV_ENABLE);
 		drain_rx_raw();
 
 		SPI_SendData(SPI2, &tx, 1);
@@ -284,7 +284,7 @@ static void test_loop_all_modes(void) {
 		}
 		CHECK(rx == tx, "loopback failed in one of the CPOL/CPHA modes");
 
-		SPI_PeripheralControl(SPI2, DISABLE);
+		SPI_PeripheralControl(SPI2, DRV_DISABLE);
 	}
 }
 
@@ -301,8 +301,8 @@ static void test_loop_interrupt_txrx(void) {
 
 	spi2_setup_default();
 	SPI_IRQPriorityConfig(IRQ_NO_SPI2, NVIC_IRQ_PRI11);
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 	drain_rx_raw();
 
 	/* Arm RX first: every TX byte produces one RX byte right away */
@@ -319,8 +319,8 @@ static void test_loop_interrupt_txrx(void) {
 	CHECK(!(SPI2->CR2 & (1U << SPI_CR2_TXEIE)),  "TXEIE left on");
 	CHECK(!(SPI2->CR2 & (1U << SPI_CR2_RXNEIE)), "RXNEIE left on");
 
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DISABLE);
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 }
 
 static void test_loop_busy_rejection(void) {
@@ -334,8 +334,8 @@ static void test_loop_busy_rejection(void) {
 	reset_events();
 
 	spi2_setup_default();
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
 	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == SPI_READY,      "first SendDataIT rejected");
 	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == SPI_BUSY_IN_TX, "second SendDataIT not rejected");
@@ -344,10 +344,10 @@ static void test_loop_busy_rejection(void) {
 	CHECK(SPI_SendDataIT(&spi2, tx, 1) == SPI_READY, "SendDataIT rejected after TX complete");
 	CHECK(test_wait_count(&spi_tx_cmplt, 2, TEST_TIMEOUT_MS), "second TX never completed");
 
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DISABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
 	test_wait_reg(&SPI2->SR, 1U << SPI_SR_BSY, 0, TEST_TIMEOUT_MS);
 	drain_rx_raw();   // RX was not read, clear the OVR it caused
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 }
 
 static void test_loop_overrun_irq(void) {
@@ -361,8 +361,8 @@ static void test_loop_overrun_irq(void) {
 
 	spi2_setup_default();
 	SPI2->CR2 |= (1U << SPI_CR2_ERRIE);   // no driver API for ERRIE, same as the apps
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, ENABLE);
-	SPI_PeripheralControl(SPI2, ENABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
+	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 	drain_rx_raw();
 
 	/* 3 bytes out, none read: the 2nd one finds RXNE still set -> OVR */
@@ -372,8 +372,8 @@ static void test_loop_overrun_irq(void) {
 	CHECK(test_wait_count(&spi_ovr, 1, TEST_TIMEOUT_MS), "no SPI_EVENT_OVR_ERR callback");
 	CHECK(!(SPI2->SR & (1U << SPI_SR_OVR)), "OVR not cleared by the driver (read DR, then SR)");
 
-	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DISABLE);
-	SPI_PeripheralControl(SPI2, DISABLE);
+	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
+	SPI_PeripheralControl(SPI2, DRV_DISABLE);
 }
 
 void test_suite_spi(void) {
@@ -395,5 +395,5 @@ void test_suite_spi(void) {
 	test_run(test_loop_overrun_irq,    "spi_loop_overrun_irq");
 
 	SPI_DeInit(SPI2);
-	SPI_PeriClockControl(SPI2, DISABLE);
+	SPI_PeriClockControl(SPI2, DRV_DISABLE);
 }

@@ -29,7 +29,7 @@ int main(void) {
 	gpioLed.Config.PuPdControl = GPIO_NOT_PUPD;
 	gpioLed.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOA, ENABLE);
+	GPIO_PeriClockControl(GPIOA, DRV_ENABLE);
 	GPIO_Init(&gpioLed);
 
 	gpioButton.Instance = GPIOC;
@@ -38,11 +38,11 @@ int main(void) {
 	gpioButton.Config.PuPdControl = GPIO_PIN_PU;
 	gpioButton.Config.Speed = GPIO_SPEED_FAST;
 
-	GPIO_PeriClockControl(GPIOC, ENABLE);
+	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioButton);
 
 	GPIO_IRQPriorityConfig(IRQ_NO_EXTI9_5, NVIC_IRQ_PRI15);
-	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, ENABLE);
+	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DRV_ENABLE);
 
 	while(1);
 }
