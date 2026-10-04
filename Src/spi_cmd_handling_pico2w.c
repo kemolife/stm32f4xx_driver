@@ -27,6 +27,10 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
+#define SPI_TIMEOUT_MS       10U    // one byte at 500 kHz takes 16 us
+
+#define DEBOUNCE_MS          200U   // ignore contact bounce after a press
+
 // ==========================================
 // 💡 CONFIGURABLE COMMAND MACROS
 // Change these values to test different requests
@@ -40,9 +44,10 @@
 // Active command used in the loop (Swap this to try different commands!)
 #define CURRENT_COMMAND   CMD_GET_HELLO
 
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000; i++);
-}
+/* Last answer from the Pico. volatile keeps it in memory, so it can be
+ * watched in the debugger (Live Expressions: reply, reply_len). */
+static volatile uint8_t reply[100];
+static volatile uint8_t reply_len;
 
 static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
@@ -114,8 +119,8 @@ static uint8_t SPI_TransferByte(SPI_RegDef_t *pSPIx, uint8_t transmitByte) {
     uint8_t receiveByte = 0;
 
     // Call your custom library API for single-byte exchange, or direct registers:
-    SPI_SendData(pSPIx, &transmitByte, 1);
-    SPI_ReceiveData(pSPIx, &receiveByte, 1);
+    SPI_SendData(pSPIx, &transmitByte, 1, SPI_TIMEOUT_MS);
+    SPI_ReceiveData(pSPIx, &receiveByte, 1, SPI_TIMEOUT_MS);
 
     return receiveByte;
 }
@@ -131,7 +136,7 @@ int main(void) {
 	while(1) {
 		// 1. Wait for button press
 		while (GPIO_ReadFromInputPin(GPIOC, 13) == 1);
-		delay();
+		SYSTICK_DelayMs(DEBOUNCE_MS);
 
 		// 2. Transmit the macro command configured at the top of the file
 		SPI_TransferByte(SPI2, CURRENT_COMMAND);
@@ -143,18 +148,18 @@ int main(void) {
 		uint8_t rxLen = SPI_TransferByte(SPI2, 0x00);
 
 		// 4. Collect payload if the specific macro command expects a return string
-		if (rxLen > 0 && rxLen < 100) {
-			uint8_t rxBuffer[100] = {0};
-
+		reply_len = 0;
+		if (rxLen > 0 && rxLen < sizeof(reply)) {
 			for(uint8_t i = 0; i < rxLen; i++) {
-				rxBuffer[i] = SPI_TransferByte(SPI2, 0x00);
+				reply[i] = SPI_TransferByte(SPI2, 0x00);
 			}
-			// rxBuffer now holds the relevant data requested by CURRENT_COMMAND
+			reply[rxLen] = 0;   // terminate, so the debugger shows it as text
+			reply_len = rxLen;
 		}
 
 		// 5. Complete cycle management
 		while ( SPI_IsBusy(SPI2) );
 		while (GPIO_ReadFromInputPin(GPIOC, 13) == 0);
-		delay();
+		SYSTICK_DelayMs(DEBOUNCE_MS);
 	}
 }

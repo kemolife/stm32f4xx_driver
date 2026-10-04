@@ -181,6 +181,35 @@ static void test_peripheral_control(void) {
 	CHECK(!(SPI2->CR1 & (1U << SPI_CR1_SPE)), "SPE not cleared by PeripheralControl(DRV_DISABLE)");
 }
 
+static void test_bad_arguments(void) {
+	uint8_t buf[2] = { 0 };
+
+	spi2_setup_default();
+
+	CHECK(SPI_SendData(SPI2, NULL, 1, TEST_TIMEOUT_MS) == DRV_ERROR,    "SendData(NULL) not refused");
+	CHECK(SPI_SendData(SPI2, buf, 0, TEST_TIMEOUT_MS) == DRV_ERROR,     "SendData(Len 0) not refused");
+	CHECK(SPI_ReceiveData(SPI2, NULL, 1, TEST_TIMEOUT_MS) == DRV_ERROR, "ReceiveData(NULL) not refused");
+	CHECK(SPI_SendDataIT(&spi2, buf, 0) == DRV_ERROR,                    "SendDataIT(Len 0) not refused");
+	CHECK(SPI_ReceiveDataIT(&spi2, NULL, 1) == DRV_ERROR,                "ReceiveDataIT(NULL) not refused");
+	CHECK(spi2.TxState == SPI_READY && spi2.RxState == SPI_READY,       "refused call changed the handle state");
+}
+
+static void test_send_timeout_when_disabled(void) {
+	/* SPE stays 0: the first byte fills DR, TXE never comes back, so the
+	 * second byte must end in DRV_TIMEOUT after ~5 ms instead of hanging. */
+	uint8_t data[4] = { 1, 2, 3, 4 };
+
+	spi2_setup_default();
+
+	uint32_t c0 = test_cycles();
+	DRV_Status_t status = SPI_SendData(SPI2, data, sizeof(data), 5);
+	uint32_t ms = (test_cycles() - c0) / 16000U;   // HSI 16 MHz
+
+	printf("    status=%d after %lu ms\n", (int)status, (unsigned long)ms);
+	CHECK(status == DRV_TIMEOUT, "SendData with SPE=0 did not return DRV_TIMEOUT");
+	CHECK(ms >= 5U && ms <= 7U,  "timeout not honoured (expected 5..7 ms)");
+}
+
 static void test_nvic_config(void) {
 	/* SPI2 = IRQ 36 -> ISER1 bit 4 */
 	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
@@ -224,8 +253,8 @@ static void test_loop_polling_8bit(void) {
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
 		rx = 0;
-		SPI_SendData(SPI2, (uint8_t *)&pattern[i], 1);
-		SPI_ReceiveData(SPI2, &rx, 1);
+		SPI_SendData(SPI2, (uint8_t *)&pattern[i], 1, TEST_TIMEOUT_MS);
+		SPI_ReceiveData(SPI2, &rx, 1, TEST_TIMEOUT_MS);
 		CHECK(rx == pattern[i], "8-bit loopback byte differs");
 	}
 
@@ -250,14 +279,14 @@ static void test_loop_polling_16bit(void) {
 
 	for (uint32_t i = 0; i < sizeof(pattern) / sizeof(pattern[0]); i++) {
 		rx = 0;
-		SPI_SendData(SPI2, (uint8_t *)&pattern[i], 2);
-		SPI_ReceiveData(SPI2, (uint8_t *)&rx, 2);
+		SPI_SendData(SPI2, (uint8_t *)&pattern[i], 2, TEST_TIMEOUT_MS);
+		SPI_ReceiveData(SPI2, (uint8_t *)&rx, 2, TEST_TIMEOUT_MS);
 		CHECK(rx == pattern[i], "16-bit loopback frame differs");
 	}
 
 	/* Odd length in 16-bit mode must be refused, not half sent */
 	uint8_t odd[3] = { 1, 2, 3 };
-	SPI_SendData(SPI2, odd, 3);
+	CHECK(SPI_SendData(SPI2, odd, 3, TEST_TIMEOUT_MS) == DRV_ERROR, "odd length in 16-bit mode not refused");
 	test_delay_ms(1);
 	CHECK(!(SPI2->SR & (1U << SPI_SR_RXNE)), "odd length in 16-bit mode was sent");
 
@@ -276,8 +305,8 @@ static void test_loop_all_modes(void) {
 		SPI_PeripheralControl(SPI2, DRV_ENABLE);
 		drain_rx_raw();
 
-		SPI_SendData(SPI2, &tx, 1);
-		SPI_ReceiveData(SPI2, &rx, 1);
+		SPI_SendData(SPI2, &tx, 1, TEST_TIMEOUT_MS);
+		SPI_ReceiveData(SPI2, &rx, 1, TEST_TIMEOUT_MS);
 
 		if (rx != tx) {
 			printf("    SPI mode %u: sent 0x%02X got 0x%02X\n", mode, tx, rx);
@@ -306,8 +335,8 @@ static void test_loop_interrupt_txrx(void) {
 	drain_rx_raw();
 
 	/* Arm RX first: every TX byte produces one RX byte right away */
-	CHECK(SPI_ReceiveDataIT(&spi2, rx, sizeof(tx)) == SPI_READY, "ReceiveDataIT rejected on idle handle");
-	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == SPI_READY,    "SendDataIT rejected on idle handle");
+	CHECK(SPI_ReceiveDataIT(&spi2, rx, sizeof(tx)) == DRV_OK, "ReceiveDataIT rejected on idle handle");
+	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == DRV_OK,    "SendDataIT rejected on idle handle");
 
 	CHECK(test_wait_count(&spi_tx_cmplt, 1, TEST_TIMEOUT_MS), "no SPI_EVENT_TX_CMPLT (timeout)");
 	CHECK(test_wait_count(&spi_rx_cmplt, 1, TEST_TIMEOUT_MS), "no SPI_EVENT_RX_CMPLT (timeout)");
@@ -337,11 +366,11 @@ static void test_loop_busy_rejection(void) {
 	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_ENABLE);
 	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
-	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == SPI_READY,      "first SendDataIT rejected");
-	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == SPI_BUSY_IN_TX, "second SendDataIT not rejected");
+	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == DRV_OK,      "first SendDataIT rejected");
+	CHECK(SPI_SendDataIT(&spi2, tx, sizeof(tx)) == DRV_BUSY, "second SendDataIT not rejected");
 	CHECK(test_wait_count(&spi_tx_cmplt, 1, TEST_TIMEOUT_MS), "TX never completed");
 
-	CHECK(SPI_SendDataIT(&spi2, tx, 1) == SPI_READY, "SendDataIT rejected after TX complete");
+	CHECK(SPI_SendDataIT(&spi2, tx, 1) == DRV_OK, "SendDataIT rejected after TX complete");
 	CHECK(test_wait_count(&spi_tx_cmplt, 2, TEST_TIMEOUT_MS), "second TX never completed");
 
 	SPI_IRQInterruptConfig(IRQ_NO_SPI2, DRV_DISABLE);
@@ -366,7 +395,7 @@ static void test_loop_overrun_irq(void) {
 	drain_rx_raw();
 
 	/* 3 bytes out, none read: the 2nd one finds RXNE still set -> OVR */
-	SPI_SendData(SPI2, data, sizeof(data));
+	SPI_SendData(SPI2, data, sizeof(data), TEST_TIMEOUT_MS);
 	test_wait_reg(&SPI2->SR, 1U << SPI_SR_BSY, 0, TEST_TIMEOUT_MS);
 
 	CHECK(test_wait_count(&spi_ovr, 1, TEST_TIMEOUT_MS), "no SPI_EVENT_OVR_ERR callback");
@@ -386,6 +415,8 @@ void test_suite_spi(void) {
 	test_run(test_init_hardware_nss,   "spi_init_hardware_nss");
 	test_run(test_peripheral_control,  "spi_peripheral_control");
 	test_run(test_nvic_config,         "spi_nvic_config");
+	test_run(test_bad_arguments,       "spi_bad_arguments");
+	test_run(test_send_timeout_when_disabled, "spi_send_timeout_when_disabled");
 
 	test_run(test_loop_polling_8bit,   "spi_loop_polling_8bit");
 	test_run(test_loop_polling_16bit,  "spi_loop_polling_16bit");

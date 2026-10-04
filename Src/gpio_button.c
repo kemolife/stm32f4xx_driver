@@ -10,9 +10,7 @@
 
 #include "stm32f446xx.h"
 
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000; i++);
-}
+#define DEBOUNCE_MS          200U   // ignore contact bounce after a press
 
 int main(void) {
 	GPIO_Handle_t gpioLed, gpioButton;
@@ -38,7 +36,7 @@ int main(void) {
 
 	while (1) {
 		if (GPIO_ReadFromInputPin(GPIOC, 5) == 0) {
-			delay();
+			SYSTICK_DelayMs(DEBOUNCE_MS);
 			GPIO_ToggleOutputPin(GPIOA, 6);
 		}
 	}

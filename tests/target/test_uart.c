@@ -10,8 +10,9 @@
  *
  *  [LOOP] jumper wire: PA9 (D8) <-> PA10 (D2).
  *
- *  UART_ReceiveData has no timeout, so it is only called after RXNE was seen
- *  with a raw register poll.
+ *  The loopback tests still poll RXNE on the raw register before
+ *  UART_ReceiveData, so a missing byte is reported as "nothing came back",
+ *  separate from a receive bug.
  *  Known good BRR values come from RM0390, not from the driver formula.
  */
 
@@ -247,6 +248,42 @@ static void test_flag_status_and_clear(void) {
 	UART_PeripheralControl(USART1, DRV_DISABLE);
 }
 
+static void test_bad_arguments(void) {
+	uint8_t buf[2] = { 0 };
+
+	uart1_setup_8n1();
+	UART_PeripheralControl(USART1, DRV_ENABLE);
+
+	CHECK(UART_SendData(&uart1, NULL, 1, TEST_TIMEOUT_MS) == DRV_ERROR,    "SendData(NULL) not refused");
+	CHECK(UART_ReceiveData(&uart1, buf, 0, TEST_TIMEOUT_MS) == DRV_ERROR,  "ReceiveData(Len 0) not refused");
+	CHECK(UART_SendDataIT(&uart1, buf, 0) == DRV_ERROR,                     "SendDataIT(Len 0) not refused");
+	CHECK(UART_ReceiveDataIT(&uart1, NULL, 1) == DRV_ERROR,                 "ReceiveDataIT(NULL) not refused");
+	CHECK(uart1.TxBusyState == UART_READY && uart1.RxBusyState == UART_READY,
+	      "refused call changed the handle state");
+
+	UART_PeripheralControl(USART1, DRV_DISABLE);
+}
+
+static void test_receive_timeout(void) {
+	/* No wire needed: nothing is sent, so RXNE never comes and the call must
+	 * end with DRV_TIMEOUT after ~5 ms. */
+	uint8_t rx;
+
+	uart1_setup_8n1();
+	UART_PeripheralControl(USART1, DRV_ENABLE);
+	drain_rx_raw(USART1);
+
+	uint32_t c0 = test_cycles();
+	DRV_Status_t status = UART_ReceiveData(&uart1, &rx, 1, 5);
+	uint32_t ms = (test_cycles() - c0) / 16000U;
+
+	printf("    status=%d after %lu ms\n", (int)status, (unsigned long)ms);
+	CHECK(status == DRV_TIMEOUT, "ReceiveData without data did not return DRV_TIMEOUT");
+	CHECK(ms >= 5U && ms <= 7U,  "timeout not honoured (expected 5..7 ms)");
+
+	UART_PeripheralControl(USART1, DRV_DISABLE);
+}
+
 static void test_nvic_config(void) {
 	static const uint8_t irqs[] = { IRQ_NO_USART1, IRQ_NO_UART4, IRQ_NO_USART6 };
 
@@ -289,13 +326,13 @@ static void test_loop_polling_8n1(void) {
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
-		UART_SendData(&uart1, (uint8_t *)&pattern[i], 1);
+		CHECK(UART_SendData(&uart1, (uint8_t *)&pattern[i], 1, TEST_TIMEOUT_MS) == DRV_OK, "UART_SendData did not return DRV_OK");
 
 		if (!wait_rxne_raw(USART1)) {
 			CHECK(0, "no byte came back (UART_SendData sends nothing?)");
 			break;
 		}
-		UART_ReceiveData(&uart1, &rx, 1);
+		UART_ReceiveData(&uart1, &rx, 1, TEST_TIMEOUT_MS);
 		CHECK(rx == pattern[i], "received byte differs from sent byte");
 	}
 
@@ -320,14 +357,14 @@ static void test_loop_polling_9bit(void) {
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern) / sizeof(pattern[0]); i++) {
-		UART_SendData(&uart1, (uint8_t *)&pattern[i], 1);
+		CHECK(UART_SendData(&uart1, (uint8_t *)&pattern[i], 1, TEST_TIMEOUT_MS) == DRV_OK, "UART_SendData did not return DRV_OK");
 
 		if (!wait_rxne_raw(USART1)) {
 			CHECK(0, "no frame came back (9-bit)");
 			break;
 		}
 		rx = 0;
-		UART_ReceiveData(&uart1, (uint8_t *)&rx, 1);
+		UART_ReceiveData(&uart1, (uint8_t *)&rx, 1, TEST_TIMEOUT_MS);
 		CHECK(rx == pattern[i], "9-bit frame differs, check the 0x01FF mask and uint16_t handling");
 	}
 
@@ -350,14 +387,14 @@ static void test_loop_polling_parity(void) {
 	drain_rx_raw(USART1);
 
 	for (uint32_t i = 0; i < sizeof(pattern); i++) {
-		UART_SendData(&uart1, (uint8_t *)&pattern[i], 1);
+		CHECK(UART_SendData(&uart1, (uint8_t *)&pattern[i], 1, TEST_TIMEOUT_MS) == DRV_OK, "UART_SendData did not return DRV_OK");
 
 		if (!wait_rxne_raw(USART1)) {
 			CHECK(0, "no byte came back (parity)");
 			break;
 		}
 		CHECK(UART_GetFlagStatus(USART1, UART_FLAG_PE) == UART_FLAG_RESET, "parity error on loopback");
-		UART_ReceiveData(&uart1, &rx, 1);
+		UART_ReceiveData(&uart1, &rx, 1, TEST_TIMEOUT_MS);
 		CHECK(rx == pattern[i], "byte differs with parity, check the 0x7F mask");
 	}
 
@@ -376,7 +413,7 @@ static void test_loop_overrun_flag(void) {
 	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
-	UART_SendData(&uart1, data, sizeof(data));
+	UART_SendData(&uart1, data, sizeof(data), TEST_TIMEOUT_MS);
 	test_delay_ms(1);   // let the last frame land
 
 	CHECK(UART_GetFlagStatus(USART1, UART_FLAG_ORE) == UART_FLAG_SET, "ORE not reported after overrun");
@@ -405,8 +442,8 @@ static void test_loop_interrupt_txrx(void) {
 	drain_rx_raw(USART1);
 
 	/* Arm RX first so the first looped-back byte is not missed */
-	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(tx)) == UART_READY, "ReceiveDataIT rejected on idle handle");
-	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == UART_READY,    "SendDataIT rejected on idle handle");
+	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(tx)) == DRV_OK, "ReceiveDataIT rejected on idle handle");
+	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == DRV_OK,    "SendDataIT rejected on idle handle");
 
 	CHECK(test_wait_count(&tx_cmplt_count, 1, TEST_TIMEOUT_MS), "no UART_EVENT_TX_CMPLT callback (timeout)");
 	CHECK(test_wait_count(&rx_cmplt_count, 1, TEST_TIMEOUT_MS), "no UART_EVENT_RX_CMPLT callback (timeout)");
@@ -442,18 +479,18 @@ static void test_loop_interrupt_busy_rejection(void) {
 	UART_PeripheralControl(USART1, DRV_ENABLE);
 	drain_rx_raw(USART1);
 
-	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(rx)) == UART_READY,      "first ReceiveDataIT rejected");
-	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(rx)) == UART_BUSY_IN_RX, "second ReceiveDataIT not rejected");
+	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(rx)) == DRV_OK,      "first ReceiveDataIT rejected");
+	CHECK(UART_ReceiveDataIT(&uart1, rx, sizeof(rx)) == DRV_BUSY, "second ReceiveDataIT not rejected");
 
-	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == UART_READY,      "first SendDataIT rejected");
-	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == UART_BUSY_IN_TX, "second SendDataIT not rejected");
+	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == DRV_OK,      "first SendDataIT rejected");
+	CHECK(UART_SendDataIT(&uart1, tx, sizeof(tx)) == DRV_BUSY, "second SendDataIT not rejected");
 
 	/* Let both transfers finish so the next test starts clean */
 	CHECK(test_wait_count(&tx_cmplt_count, 1, TEST_TIMEOUT_MS), "TX never completed");
 	CHECK(test_wait_count(&rx_cmplt_count, 1, TEST_TIMEOUT_MS), "RX never completed");
 
 	/* After completion the handle must accept a new transfer */
-	CHECK(UART_SendDataIT(&uart1, tx, 1) == UART_READY, "SendDataIT rejected after TX complete");
+	CHECK(UART_SendDataIT(&uart1, tx, 1) == DRV_OK, "SendDataIT rejected after TX complete");
 	CHECK(test_wait_count(&tx_cmplt_count, 2, TEST_TIMEOUT_MS), "second TX never completed");
 
 	UART_IRQInterruptConfig(IRQ_NO_USART1, DRV_DISABLE);
@@ -472,6 +509,8 @@ void test_suite_uart(void) {
 	test_run(test_peripheral_control,        "uart_peripheral_control");
 	test_run(test_flag_status_and_clear,     "uart_flag_status_and_clear");
 	test_run(test_nvic_config,               "uart_nvic_config");
+	test_run(test_bad_arguments,             "uart_bad_arguments");
+	test_run(test_receive_timeout,           "uart_receive_timeout");
 
 	test_run(test_loop_polling_8n1,              "uart_loop_polling_8n1");
 	test_run(test_loop_polling_9bit,             "uart_loop_polling_9bit");

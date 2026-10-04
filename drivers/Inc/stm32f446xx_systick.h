@@ -36,10 +36,19 @@ void SYSTICK_Init(void);
 
 /**
  * @brief  Milliseconds since SYSTICK_Init. Wraps after ~49 days.
- * @note   Compare times with subtraction, which works across the wrap:
+ * @note   Starts SysTick if it is not running yet.
+ *         Compare times with subtraction, which works across the wrap:
  *         if ((SYSTICK_GetTick() - start) >= timeout_ms) { ... }
  */
 uint32_t SYSTICK_GetTick(void);
+
+/**
+ * @brief  Checks a timeout that started at tick value start
+ * @param  start: SYSTICK_GetTick() value taken when the wait began
+ * @param  timeout_ms: allowed time, DRV_MAX_DELAY = never expires
+ * @return 1 when timeout_ms or more have passed, 0 otherwise
+ */
+uint8_t SYSTICK_IsTimeout(uint32_t start, uint32_t timeout_ms);
 
 /**
  * @brief  Waits at least ms milliseconds (at most ms + 1)

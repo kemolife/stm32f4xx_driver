@@ -10,15 +10,15 @@
 #include "stm32f446xx.h"
 
 static void clear_ADDR_flag(I2C_Handle_t *pI2CHandle);
-static void clear_ADDR(I2C_Handle_t *pI2CHandle);
+static DRV_Status_t wait_sr1(I2C_RegDef_t *pI2Cx, uint32_t bit, uint32_t start, uint32_t Timeout);
+static DRV_Status_t master_abort(I2C_Handle_t *pI2CHandle, DRV_Status_t status);
 static void I2C_MasterHandleTXEInterrupt(I2C_Handle_t *pI2CHandle);
 static void I2C_MasterHandleRXNEInterrupt(I2C_Handle_t *pI2CHandle);
 static void I2C_CloseSendData(I2C_Handle_t *pI2CHandle);
 static void I2C_CloseReceiveData(I2C_Handle_t *pI2CHandle);
 
 /* Clear ADDR with the mandatory read SR1 -> read SR2 sequence, without waiting.
- * Safe to call from an ISR, where ADDR is already known to be set. Blocking
- * inside an interrupt handler is never acceptable, hence the split below. */
+ * Callers make sure ADDR is set first (ISR, or wait_sr1 in the blocking paths). */
 static void clear_ADDR_flag(I2C_Handle_t *pI2CHandle) {
 	uint32_t dummy_read;
 
@@ -27,16 +27,31 @@ static void clear_ADDR_flag(I2C_Handle_t *pI2CHandle) {
 	(void)dummy_read;
 }
 
-/* Wait for ADDR, then clear it. Polling paths only.
- * Until ADDR is cleared the clock stays stretched and no data byte moves.
- * Callers that must program ACK before ADDR is cleared (single byte receive) have
- * to wait for ADDR themselves first; the wait here is then a cheap no-op. */
-static void clear_ADDR(I2C_Handle_t *pI2CHandle) {
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_ADDR))) {
-		/* busy wait */
+/* Waits until one SR1 flag is set, for the blocking master functions.
+ * Returns DRV_ERROR at once when the slave answered NACK (AF), DRV_TIMEOUT
+ * when the whole call ran out of time, DRV_OK when the flag came. */
+static DRV_Status_t wait_sr1(I2C_RegDef_t *pI2Cx, uint32_t bit, uint32_t start, uint32_t Timeout) {
+	while (!(pI2Cx->SR1 & (1U << bit))) {
+		if (pI2Cx->SR1 & (1U << I2C_SR1_AF)) {
+			return DRV_ERROR;
+		}
+		if (SYSTICK_IsTimeout(start, Timeout)) {
+			return DRV_TIMEOUT;
+		}
 	}
+	return DRV_OK;
+}
 
-	clear_ADDR_flag(pI2CHandle);
+/* Ends a failed blocking master transfer so the bus is usable again:
+ * STOP releases SDA/SCL, AF is cleared (rc_w0), ACK goes back to the config. */
+static DRV_Status_t master_abort(I2C_Handle_t *pI2CHandle, DRV_Status_t status) {
+	pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_STOP);
+	pI2CHandle->Instance->SR1 &= ~(1U << I2C_SR1_AF);
+
+	if (pI2CHandle->Config.ACKControl == I2C_ACK_ENABLE) {
+		I2C_ManageAcking(pI2CHandle->Instance, I2C_ACK_ENABLE);
+	}
+	return status;
 }
 
 /******************************************************************************************
@@ -175,42 +190,63 @@ void I2C_DeInit(I2C_RegDef_t *pI2Cx) {
  * @param[in]          - number of bytes to send
  * @param[in]          - 7-bit slave address
  * @param[in]          - I2C_ENABLE_SR or I2C_DISABLE_SR
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (slave answered NACK, or bad argument) or
+ *                       DRV_TIMEOUT (bus stuck, missing pull-ups, clock stretched too long)
  *
- * @Note               - this is a blocking call, it returns only when every byte has left
- *                       the shift register
+ * @Note               - blocking call. On DRV_ERROR and DRV_TIMEOUT a STOP is sent, so
+ *                       the bus is free again for the next transfer
  *
  ******************************************************************************************/
-void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+DRV_Status_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr, uint32_t Timeout) {
+	I2C_RegDef_t *pI2Cx = pI2CHandle->Instance;
+	DRV_Status_t status;
+
+	if (pTxBuffer == NULL && Len > 0U) {
+		return DRV_ERROR;
+	}
+
+	uint32_t start = SYSTICK_GetTick();
+
 	/* 1. Generate the START condition. The peripheral first waits for the bus to be
 	 *    free, then pulls SDA low while SCL is still high. */
-	pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
+	pI2Cx->CR1 |= (1U << I2C_CR1_START);
 
 	/* 2. Wait until SB is set, which confirms the START was placed on the bus.
 	 *    While SB is set the hardware stretches SCL low, so the bus cannot move on
-	 *    without us. SB is cleared by reading SR1 and then writing DR (step 3). */
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_SB)));
+	 *    without us. SB is cleared by reading SR1 and then writing DR (step 3).
+	 *    No SB in time: bus held by someone else, or no pull-ups. */
+	status = wait_sr1(pI2Cx, I2C_SR1_SB, start, Timeout);
+	if (status != DRV_OK) {
+		return master_abort(pI2CHandle, status);
+	}
 
 	/* 3. Send the address phase: 7-bit slave address in bits [7:1] and the R/W bit
 	 *    cleared in bit 0 to ask for a write. This DR write also clears SB. */
-	pI2CHandle->Instance->DR = (((uint32_t)SlaveAddr << 1) & ~(1U));
+	pI2Cx->DR = (((uint32_t)SlaveAddr << 1) & ~(1U));
 
-	/* 4. Wait for ADDR. It is set only after the slave acknowledged its address,
-	 *    so this loop also catches a missing or wrong slave (it will hang there).
-	 *    SCL stays stretched low until ADDR is cleared. */
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_ADDR)));
+	/* 4. Wait for ADDR. It is set only after the slave acknowledged its address.
+	 *    A missing or wrong slave answers NACK instead: AF is set and wait_sr1
+	 *    returns DRV_ERROR at once. SCL stays stretched low until ADDR is cleared. */
+	status = wait_sr1(pI2Cx, I2C_SR1_ADDR, start, Timeout);
+	if (status != DRV_OK) {
+		return master_abort(pI2CHandle, status);
+	}
 
 	/* 5. Clear ADDR with the mandatory read SR1 -> read SR2 sequence. Until this is
 	 *    done the clock stays stretched and no data byte can be shifted out. */
-	clear_ADDR(pI2CHandle);
+	clear_ADDR_flag(pI2CHandle);
 
 	/* 6. Push the payload out byte by byte. TXE=1 means DR is free for the next
 	 *    byte while the previous one is still being shifted, which keeps the
-	 *    transfer pipelined and the clock free of extra stretching. */
+	 *    transfer pipelined. AF here means the slave refused a data byte. */
 	while (Len > 0U) {
-		while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_TXE)));
-		pI2CHandle->Instance->DR = *pTxBuffer;
+		status = wait_sr1(pI2Cx, I2C_SR1_TXE, start, Timeout);
+		if (status != DRV_OK) {
+			return master_abort(pI2CHandle, status);
+		}
+		pI2Cx->DR = *pTxBuffer;
 		pTxBuffer++;
 		Len--;
 	}
@@ -218,15 +254,22 @@ void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t L
 	/* 7. When the loop ends the last byte is written to DR but may still be on the
 	 *    wire. Wait for TXE=1 and BTF=1 together: DR is empty and the shift
 	 *    register is done, so a STOP now cannot truncate the final byte. */
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_TXE)));
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_BTF)));
+	status = wait_sr1(pI2Cx, I2C_SR1_TXE, start, Timeout);
+	if (status == DRV_OK) {
+		status = wait_sr1(pI2Cx, I2C_SR1_BTF, start, Timeout);
+	}
+	if (status != DRV_OK) {
+		return master_abort(pI2CHandle, status);
+	}
 
 	/* 8. Generate STOP and release the bus, unless the caller asked to hold it for
 	 *    a repeated START (I2C_ENABLE_SR), which is what a register-read sequence
 	 *    needs. Writing STOP also clears BTF. */
 	if (Sr == I2C_DISABLE_SR) {
-		pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_STOP);
+		pI2Cx->CR1 |= (1U << I2C_CR1_STOP);
 	}
+
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -239,68 +282,89 @@ void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t L
  * @param[in]          - number of bytes to receive
  * @param[in]          - 7-bit slave address
  * @param[in]          - I2C_ENABLE_SR or I2C_DISABLE_SR
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (slave answered NACK, or bad argument) or
+ *                       DRV_TIMEOUT
  *
- * @Note               - this is a blocking call, it returns only when every byte has been
- *                       read out of the data register
+ * @Note               - blocking call. On DRV_ERROR and DRV_TIMEOUT a STOP is sent and ACK
+ *                       is restored, so the bus is free again for the next transfer
  *
  ******************************************************************************************/
-void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+DRV_Status_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr, uint32_t Timeout) {
+	I2C_RegDef_t *pI2Cx = pI2CHandle->Instance;
+	DRV_Status_t status;
+
+	if (pRxBuffer == NULL && Len > 0U) {
+		return DRV_ERROR;
+	}
+
+	uint32_t start = SYSTICK_GetTick();
+
 	/* 1. Generate the START condition. The peripheral first waits for the bus to be
 	 *    free, then pulls SDA low while SCL is still high. */
-	pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
+	pI2Cx->CR1 |= (1U << I2C_CR1_START);
 
 	/* 2. Wait until SB is set, which confirms the START was placed on the bus.
-	 *    While SB is set the hardware stretches SCL low, so the bus cannot move on
-	 *    without us. SB is cleared by reading SR1 and then writing DR (step 3). */
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_SB)));
+	 *    SB is cleared by reading SR1 and then writing DR (step 3). */
+	status = wait_sr1(pI2Cx, I2C_SR1_SB, start, Timeout);
+	if (status != DRV_OK) {
+		return master_abort(pI2CHandle, status);
+	}
 
 	/* 3. Send the address phase: 7-bit slave address in bits [7:1] and the R/W bit
 	 *    set in bit 0 to ask for a read. This DR write also clears SB. */
-	pI2CHandle->Instance->DR = (((uint32_t)SlaveAddr << 1) | 1U);
+	pI2Cx->DR = (((uint32_t)SlaveAddr << 1) | 1U);
 
-	/* 4. Wait for ADDR. It is set only after the slave acknowledged its address,
-	 *    so this loop also catches a missing or wrong slave (it will hang there).
+	/* 4. Wait for ADDR. A missing slave answers NACK: AF, DRV_ERROR at once.
 	 *    SCL stays stretched low until ADDR is cleared, which is what gives us the
 	 *    time to set up ACK/STOP below before any data byte is clocked in. */
-	while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_ADDR)));
+	status = wait_sr1(pI2Cx, I2C_SR1_ADDR, start, Timeout);
+	if (status != DRV_OK) {
+		return master_abort(pI2CHandle, status);
+	}
 
 	if (Len == 0U) {
 		/* 5a. Nothing to read: release the clock and close the transfer. */
-		clear_ADDR(pI2CHandle);
+		clear_ADDR_flag(pI2CHandle);
 		if (Sr == I2C_DISABLE_SR) {
-			pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_STOP);
+			pI2Cx->CR1 |= (1U << I2C_CR1_STOP);
 		}
 	} else if (Len == 1U) {
 		/* 5b. Single byte. RM0390: ACK must be cleared BEFORE ADDR is cleared,
 		 *     otherwise the hardware acknowledges the only byte and the slave
 		 *     keeps driving the bus. STOP is programmed right after ADDR clears
 		 *     and before the byte arrives. */
-		I2C_ManageAcking(pI2CHandle->Instance, I2C_ACK_DISABLE);
-		clear_ADDR(pI2CHandle);
+		I2C_ManageAcking(pI2Cx, I2C_ACK_DISABLE);
+		clear_ADDR_flag(pI2CHandle);
 		if (Sr == I2C_DISABLE_SR) {
-			pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_STOP);
+			pI2Cx->CR1 |= (1U << I2C_CR1_STOP);
 		}
-		while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_RXNE)));
-		*pRxBuffer = (uint8_t)pI2CHandle->Instance->DR;
+		status = wait_sr1(pI2Cx, I2C_SR1_RXNE, start, Timeout);
+		if (status != DRV_OK) {
+			return master_abort(pI2CHandle, status);
+		}
+		*pRxBuffer = (uint8_t)pI2Cx->DR;
 	} else {
 		/* 5c. Multi byte. Read while RXNE=1 means a byte is ready in DR. When two
 		 *     bytes are still outstanding, drop ACK and program STOP so the last
 		 *     byte is answered with a NACK and the bus is released after it. */
-		clear_ADDR(pI2CHandle);
+		clear_ADDR_flag(pI2CHandle);
 
 		for (uint32_t i = Len; i > 0U; i--) {
-			while (!(pI2CHandle->Instance->SR1 & (1U << I2C_SR1_RXNE)));
+			status = wait_sr1(pI2Cx, I2C_SR1_RXNE, start, Timeout);
+			if (status != DRV_OK) {
+				return master_abort(pI2CHandle, status);
+			}
 
 			if (i == 2U) {
-				I2C_ManageAcking(pI2CHandle->Instance, I2C_ACK_DISABLE);
+				I2C_ManageAcking(pI2Cx, I2C_ACK_DISABLE);
 				if (Sr == I2C_DISABLE_SR) {
-					pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_STOP);
+					pI2Cx->CR1 |= (1U << I2C_CR1_STOP);
 				}
 			}
 
-			*pRxBuffer = (uint8_t)pI2CHandle->Instance->DR;
+			*pRxBuffer = (uint8_t)pI2Cx->DR;
 			pRxBuffer++;
 		}
 	}
@@ -308,8 +372,10 @@ void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_
 	/* 6. Restore ACK to whatever the handle was configured with, so the next
 	 *    transfer does not inherit the NACK left over from this one. */
 	if (pI2CHandle->Config.ACKControl == I2C_ACK_ENABLE) {
-		I2C_ManageAcking(pI2CHandle->Instance, I2C_ACK_ENABLE);
+		I2C_ManageAcking(pI2Cx, I2C_ACK_ENABLE);
 	}
+
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -385,34 +451,36 @@ void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t AckControl) {
  * @param[in]          - 7-bit slave address
  * @param[in]          - I2C_ENABLE_SR or I2C_DISABLE_SR
  *
- * @return             - the state the handle was in before the call. I2C_READY means the
- *                       transfer was accepted, anything else means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a transfer is still running on
+ *                       this handle (nothing changed)
  *
  * @Note               - returns as soon as START is requested. The rest of the transfer runs
  *                       in I2C_EV_IRQHandling. The buffer must stay valid until the
  *                       I2C_EVENT_TX_CMPLT callback arrives
  *
  ******************************************************************************************/
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+DRV_Status_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
 	uint8_t busystate = pI2CHandle->TxRxState;
 
-	if ((busystate != I2C_BUSY_IN_TX) && (busystate != I2C_BUSY_IN_RX)) {
-		pI2CHandle->pTxBuffer = pTxBuffer;
-		pI2CHandle->TxLen = Len;
-		pI2CHandle->TxRxState = I2C_BUSY_IN_TX;
-		pI2CHandle->DevAddr = SlaveAddr;
-		pI2CHandle->Sr = Sr;
-
-		/* START makes SB fire, which is where the address phase is driven from. */
-		pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
-
-		/* Arm the three interrupt sources the state machine runs on. */
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITEVTEN);
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITBUFEN);
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITERREN);
+	if ((busystate == I2C_BUSY_IN_TX) || (busystate == I2C_BUSY_IN_RX)) {
+		return DRV_BUSY;
 	}
 
-	return busystate;
+	pI2CHandle->pTxBuffer = pTxBuffer;
+	pI2CHandle->TxLen = Len;
+	pI2CHandle->TxRxState = I2C_BUSY_IN_TX;
+	pI2CHandle->DevAddr = SlaveAddr;
+	pI2CHandle->Sr = Sr;
+
+	/* START makes SB fire, which is where the address phase is driven from. */
+	pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
+
+	/* Arm the three interrupt sources the state machine runs on. */
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITEVTEN);
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITBUFEN);
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITERREN);
+
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -426,33 +494,35 @@ uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint3
  * @param[in]          - 7-bit slave address
  * @param[in]          - I2C_ENABLE_SR or I2C_DISABLE_SR
  *
- * @return             - the state the handle was in before the call. I2C_READY means the
- *                       transfer was accepted, anything else means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a transfer is still running on
+ *                       this handle (nothing changed)
  *
  * @Note               - the buffer must stay valid until the I2C_EVENT_RX_CMPLT callback
  *
  ******************************************************************************************/
-uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
+DRV_Status_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr) {
 	uint8_t busystate = pI2CHandle->TxRxState;
 
-	if ((busystate != I2C_BUSY_IN_TX) && (busystate != I2C_BUSY_IN_RX)) {
-		pI2CHandle->pRxBuffer = pRxBuffer;
-		pI2CHandle->RxLen = Len;
-		/* RxSize is the total length. RxLen counts down; the RXNE handler needs
-		 * both to know when only two bytes are left and ACK must be dropped. */
-		pI2CHandle->RxSize = Len;
-		pI2CHandle->TxRxState = I2C_BUSY_IN_RX;
-		pI2CHandle->DevAddr = SlaveAddr;
-		pI2CHandle->Sr = Sr;
-
-		pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
-
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITEVTEN);
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITBUFEN);
-		pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITERREN);
+	if ((busystate == I2C_BUSY_IN_TX) || (busystate == I2C_BUSY_IN_RX)) {
+		return DRV_BUSY;
 	}
 
-	return busystate;
+	pI2CHandle->pRxBuffer = pRxBuffer;
+	pI2CHandle->RxLen = Len;
+	/* RxSize is the total length. RxLen counts down; the RXNE handler needs
+	 * both to know when only two bytes are left and ACK must be dropped. */
+	pI2CHandle->RxSize = Len;
+	pI2CHandle->TxRxState = I2C_BUSY_IN_RX;
+	pI2CHandle->DevAddr = SlaveAddr;
+	pI2CHandle->Sr = Sr;
+
+	pI2CHandle->Instance->CR1 |= (1U << I2C_CR1_START);
+
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITEVTEN);
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITBUFEN);
+	pI2CHandle->Instance->CR2 |= (1U << I2C_CR2_ITERREN);
+
+	return DRV_OK;
 }
 
 /******************************************************************************************

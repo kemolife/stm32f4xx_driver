@@ -58,11 +58,40 @@ void SYSTICK_Init(void) {
  * @return             - tick count in ms
  *
  * @Note               - wraps after 2^32 ms (~49 days). Use (now - start) for elapsed
- *                       time: unsigned subtraction gives the right result across the wrap
+ *                       time: unsigned subtraction gives the right result across the wrap.
+ *                       Starts SysTick on first use, so driver timeouts work even if the
+ *                       application never called SYSTICK_Init
  *
  ******************************************************************************************/
 uint32_t SYSTICK_GetTick(void) {
+	if (!(SYSTICK->CTRL & (1U << SYSTICK_CTRL_ENABLE))) {
+		SYSTICK_Init();
+	}
 	return tick_ms;
+}
+
+/******************************************************************************************
+ * @fn                 - SYSTICK_IsTimeout
+ *
+ * @brief              - Reports whether a timeout has expired
+ *
+ * @param[in]          - tick value when the wait started
+ * @param[in]          - allowed time in ms, DRV_MAX_DELAY = forever
+ *
+ * @return             - 1 if expired, 0 if not
+ *
+ * @Note               - used by every blocking driver function:
+ *                         uint32_t start = SYSTICK_GetTick();
+ *                         while (!flag) {
+ *                             if (SYSTICK_IsTimeout(start, Timeout)) return DRV_TIMEOUT;
+ *                         }
+ *
+ ******************************************************************************************/
+uint8_t SYSTICK_IsTimeout(uint32_t start, uint32_t timeout_ms) {
+	if (timeout_ms == DRV_MAX_DELAY) {
+		return 0U;
+	}
+	return ((SYSTICK_GetTick() - start) >= timeout_ms) ? 1U : 0U;
 }
 
 /******************************************************************************************

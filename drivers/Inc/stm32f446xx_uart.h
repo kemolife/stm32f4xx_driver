@@ -191,28 +191,32 @@ void UART_ClearFlag(UART_RegDef_t *pUARTx, uint32_t FlagName);
  * @param  pUARTHandle: Pointer to the UART handle structure
  * @param  pTxBuffer: Pointer to the data buffer to be transmitted
  * @param  Len: Number of frames to send
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  */
-void UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len);
+DRV_Status_t UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len, uint32_t Timeout);
 
 /**
  * @brief  Receives data over the UART (Blocking/Polling method)
  * @param  pUARTHandle: Pointer to the UART handle structure
  * @param  pRxBuffer: Pointer to memory buffer where received data will be stored
  * @param  Len: Number of frames to receive
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  */
-void UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len);
+DRV_Status_t UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len, uint32_t Timeout);
 
 /**
  * @brief  Starts an interrupt driven transmission
- * @return State before the call. UART_READY means the transfer was accepted
+ * @return DRV_OK (started), DRV_BUSY (still running) or DRV_ERROR
  */
-uint8_t UART_SendDataIT(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len);
+DRV_Status_t UART_SendDataIT(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len);
 
 /**
  * @brief  Starts an interrupt driven reception
- * @return State before the call. UART_READY means the transfer was accepted
+ * @return DRV_OK (started), DRV_BUSY (still running) or DRV_ERROR
  */
-uint8_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len);
+DRV_Status_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len);
 
 /**
  * @brief  Configures the NVIC interrupt controller settings for UART interrupts

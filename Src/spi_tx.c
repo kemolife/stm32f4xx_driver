@@ -10,6 +10,8 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
+#define SPI_TIMEOUT_MS  10U   // 5 bytes at 2 MHz take 20 us
+
 static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
 
@@ -58,7 +60,7 @@ int main(void) {
 	SPI_PeripheralControl(SPI2, DRV_ENABLE);
 
 	uint8_t message[] = "HELLO";
-	SPI_SendData(SPI2, message, strlen((char*)message));
+	SPI_SendData(SPI2, message, strlen((char*)message), SPI_TIMEOUT_MS);
 
 	// SendData returns when the last byte is queued; wait until it is on the wire
 	while (SPI_IsBusy(SPI2));

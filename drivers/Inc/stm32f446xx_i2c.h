@@ -112,8 +112,11 @@ void I2C_DeInit(I2C_RegDef_t *pI2Cx);
  * @param  Len: Length of data bytes to send
  * @param  SlaveAddr: 7-bit address of the target slave
  * @param  Sr: I2C_ENABLE_SR to keep the bus, I2C_DISABLE_SR to issue a STOP
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (slave answered NACK) or DRV_TIMEOUT. On errors a
+ *         STOP is sent, so the bus is free again
  */
-void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
+DRV_Status_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr, uint32_t Timeout);
 
 /**
  * @brief  Reads data from a slave device as bus master (Blocking/Polling method)
@@ -122,8 +125,11 @@ void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t L
  * @param  Len: Length of data bytes to receive
  * @param  SlaveAddr: 7-bit address of the target slave
  * @param  Sr: I2C_ENABLE_SR to keep the bus, I2C_DISABLE_SR to issue a STOP
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (slave answered NACK) or DRV_TIMEOUT. On errors a
+ *         STOP is sent, so the bus is free again
  */
-void I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
+DRV_Status_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr, uint32_t Timeout);
 
 /**
  * @brief  Configures the NVIC interrupt controller settings for I2C interrupts
@@ -175,17 +181,17 @@ void I2C_ManageAcking(I2C_RegDef_t *pI2Cx, uint8_t AckControl);
 
 /**
  * @brief  Starts an interrupt driven write to a slave as bus master
- * @return State before the call. I2C_READY means the transfer was accepted
+ * @return DRV_OK (started) or DRV_BUSY (a transfer is running on this handle)
  * @note   The buffer must stay valid until the I2C_EVENT_TX_CMPLT callback
  */
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
+DRV_Status_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
 /**
  * @brief  Starts an interrupt driven read from a slave as bus master
- * @return State before the call. I2C_READY means the transfer was accepted
+ * @return DRV_OK (started) or DRV_BUSY (a transfer is running on this handle)
  * @note   The buffer must stay valid until the I2C_EVENT_RX_CMPLT callback
  */
-uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
+DRV_Status_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRxBuffer, uint32_t Len, uint8_t SlaveAddr, uint8_t Sr);
 
 /**
  * @brief  Sends a single byte while the peripheral is addressed as a slave

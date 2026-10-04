@@ -25,13 +25,13 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
+#define UART_TIMEOUT_MS      100U   // 64 bytes at 115200 baud take 5.6 ms
+
+#define DEBOUNCE_MS          200U   // ignore contact bounce after a press
+
 #define BUTTON_PIN      13   // B1 on PC13, active low
 
 static UART_Handle_t uart2Handle;
-
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000; i++);
-}
 
 static void UART_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioUART;
@@ -99,21 +99,21 @@ int main(void) {
 
 	// Banner right after reset, so you can see the link works before pressing
 	const char *banner = "\r\nuart_tx ready, press B1\r\n";
-	UART_SendData(&uart2Handle, (uint8_t *)banner, strlen(banner));
+	UART_SendData(&uart2Handle, (uint8_t *)banner, strlen(banner), UART_TIMEOUT_MS);
 
 	while (1) {
 		// 1. Wait for button press (active low)
 		while (GPIO_ReadFromInputPin(GPIOC, BUTTON_PIN) == 1);
-		delay(); // Simple debounce delay
+		SYSTICK_DelayMs(DEBOUNCE_MS); // Simple debounce delay
 
 		// 2. Build and send the line. UART_SendData returns only after TC=1,
 		//    so the buffer can be reused right after the call.
 		int len = snprintf(message, sizeof(message),
 		                   "[%lu] Hello from STM32F446 over UART\r\n", (unsigned long)count++);
-		UART_SendData(&uart2Handle, (uint8_t *)message, (uint32_t)len);
+		UART_SendData(&uart2Handle, (uint8_t *)message, (uint32_t)len, UART_TIMEOUT_MS);
 
 		// 3. Wait for user to RELEASE the button before looping again
 		while (GPIO_ReadFromInputPin(GPIOC, BUTTON_PIN) == 0);
-		delay();
+		SYSTICK_DelayMs(DEBOUNCE_MS);
 	}
 }

@@ -18,9 +18,8 @@
  *  Internal pull-ups are also enabled, which is often enough at 100 kHz with
  *  short wires, but external ones are the correct setup.
  *
- *  The blocking master API has no timeout: with a wrong wire or a silent
- *  slave it hangs in a while loop. So the IT tests run first. The blocking
- *  test runs only if the IT write proved that the slave answers.
+ *  The blocking master API stops on a NACK (DRV_ERROR) and on its Timeout
+ *  (DRV_TIMEOUT), so no test here can hang the board.
  */
 
 #include <string.h>
@@ -45,8 +44,6 @@ static volatile uint8_t s_rx_len;
 static volatile uint8_t s_tx_buf[16];
 static volatile uint8_t s_tx_idx;
 static volatile uint8_t s_stop;
-
-static uint8_t link_ok;     /* set when the IT write passed, gates the blocking test */
 
 void I2C1_EV_IRQHandler(void) { I2C_EV_IRQHandling(&i2c1); }
 void I2C1_ER_IRQHandler(void) { I2C_ER_IRQHandling(&i2c1); }
@@ -298,16 +295,14 @@ static void loop_teardown(void) {
 static void test_loop_it_master_write(void) {
 	static uint8_t tx[] = { 0x10, 0xA5, 0x5A, 0x00, 0xFF };
 
-	link_ok = 0;
 	if (!loop_setup()) {
 		return;
 	}
 
-	CHECK(I2C_MasterSendDataIT(&i2c1, tx, sizeof(tx), SLAVE_ADDR, I2C_DISABLE_SR) == I2C_READY,
+	CHECK(I2C_MasterSendDataIT(&i2c1, tx, sizeof(tx), SLAVE_ADDR, I2C_DISABLE_SR) == DRV_OK,
 	      "MasterSendDataIT rejected on idle handle");
 
-	int done = test_wait_count(&m_tx_cmplt, 1, TEST_TIMEOUT_MS);
-	CHECK(done, "no I2C_EVENT_TX_CMPLT on master (timeout)");
+	CHECK(test_wait_count(&m_tx_cmplt, 1, TEST_TIMEOUT_MS), "no I2C_EVENT_TX_CMPLT on master (timeout)");
 	CHECK(m_af == 0, "master got AF: slave did not ACK its address or data");
 	CHECK(test_wait_count(&s_stop, 1, TEST_TIMEOUT_MS), "slave did not see STOP");
 
@@ -316,7 +311,6 @@ static void test_loop_it_master_write(void) {
 	CHECK(i2c1.TxRxState == I2C_READY, "master state not back to I2C_READY");
 	CHECK(test_wait_reg(&I2C1->SR2, 1U << I2C_SR2_BUSY, 0, TEST_TIMEOUT_MS), "bus still BUSY after STOP");
 
-	link_ok = done && (m_af == 0) && (s_rx_len == sizeof(tx));
 	loop_teardown();
 }
 
@@ -331,7 +325,7 @@ static void test_loop_it_master_read(void) {
 	memcpy((void *)s_tx_buf, "WXYZ", 4);
 	memset(rx, 0, sizeof(rx));
 
-	CHECK(I2C_MasterReceiveDataIT(&i2c1, rx, sizeof(rx), SLAVE_ADDR, I2C_DISABLE_SR) == I2C_READY,
+	CHECK(I2C_MasterReceiveDataIT(&i2c1, rx, sizeof(rx), SLAVE_ADDR, I2C_DISABLE_SR) == DRV_OK,
 	      "MasterReceiveDataIT rejected on idle handle");
 	CHECK(test_wait_count(&m_rx_cmplt, 1, TEST_TIMEOUT_MS), "no I2C_EVENT_RX_CMPLT (4 bytes)");
 	CHECK(memcmp(rx, "WXYZ", 4) == 0, "master read data differs (4 bytes)");
@@ -341,7 +335,7 @@ static void test_loop_it_master_read(void) {
 	s_tx_idx = 0;
 	s_tx_buf[0] = 0x3C;
 	rx1[0] = 0;
-	CHECK(I2C_MasterReceiveDataIT(&i2c1, rx1, 1, SLAVE_ADDR, I2C_DISABLE_SR) == I2C_READY,
+	CHECK(I2C_MasterReceiveDataIT(&i2c1, rx1, 1, SLAVE_ADDR, I2C_DISABLE_SR) == DRV_OK,
 	      "MasterReceiveDataIT rejected (1 byte)");
 	CHECK(test_wait_count(&m_rx_cmplt, 2, TEST_TIMEOUT_MS), "no I2C_EVENT_RX_CMPLT (1 byte)");
 	CHECK(rx1[0] == 0x3C, "master read data differs (1 byte)");
@@ -359,7 +353,7 @@ static void test_loop_it_nack_absent_slave(void) {
 		return;
 	}
 
-	CHECK(I2C_MasterSendDataIT(&i2c1, tx, sizeof(tx), ABSENT_ADDR, I2C_DISABLE_SR) == I2C_READY,
+	CHECK(I2C_MasterSendDataIT(&i2c1, tx, sizeof(tx), ABSENT_ADDR, I2C_DISABLE_SR) == DRV_OK,
 	      "MasterSendDataIT rejected on idle handle");
 
 	CHECK(test_wait_count(&m_af, 1, TEST_TIMEOUT_MS), "no I2C_ERROR_AF for an address nobody owns");
@@ -374,10 +368,6 @@ static void test_loop_blocking_register_read(void) {
 	uint8_t reg = 0x20;
 	uint8_t rx[3] = { 0 };
 
-	if (!link_ok) {
-		SKIP("i2c_loop_it_master_write did not pass; the blocking API has no timeout and would hang");
-		return;
-	}
 	if (!loop_setup()) {
 		return;
 	}
@@ -385,14 +375,43 @@ static void test_loop_blocking_register_read(void) {
 	memcpy((void *)s_tx_buf, "\x11\x22\x33", 3);
 
 	/* Typical sensor read: write register address, repeated START, read 3 bytes */
-	I2C_MasterSendData(&i2c1, &reg, 1, SLAVE_ADDR, I2C_ENABLE_SR);
-	I2C_MasterReceiveData(&i2c1, rx, sizeof(rx), SLAVE_ADDR, I2C_DISABLE_SR);
+	CHECK(I2C_MasterSendData(&i2c1, &reg, 1, SLAVE_ADDR, I2C_ENABLE_SR, TEST_TIMEOUT_MS) == DRV_OK,
+	      "blocking write of the register address failed");
+	CHECK(I2C_MasterReceiveData(&i2c1, rx, sizeof(rx), SLAVE_ADDR, I2C_DISABLE_SR, TEST_TIMEOUT_MS) == DRV_OK,
+	      "blocking read after repeated START failed");
 
 	CHECK(s_rx_len == 1 && s_rx_buf[0] == reg, "slave did not get the register byte");
 	CHECK(rx[0] == 0x11 && rx[1] == 0x22 && rx[2] == 0x33, "blocking read data differs");
 	CHECK(test_wait_count(&s_stop, 1, TEST_TIMEOUT_MS), "no STOP after the read");
 	CHECK(s_stop == 1, "STOP seen between write and read: repeated START not used");
 	CHECK(test_wait_reg(&I2C1->SR2, 1U << I2C_SR2_BUSY, 0, TEST_TIMEOUT_MS), "bus still BUSY");
+
+	loop_teardown();
+}
+
+static void test_loop_blocking_nack_absent_slave(void) {
+	uint8_t data = 0x01;
+	uint8_t rx = 0;
+
+	if (!loop_setup()) {
+		return;
+	}
+
+	/* Nobody owns ABSENT_ADDR: the address byte gets a NACK. The call must stop
+	 * at once with DRV_ERROR (not wait for the timeout) and free the bus. */
+	uint32_t c0 = test_cycles();
+	DRV_Status_t st_write = I2C_MasterSendData(&i2c1, &data, 1, ABSENT_ADDR, I2C_DISABLE_SR, TEST_TIMEOUT_MS);
+	uint32_t ms = (test_cycles() - c0) / 16000U;
+
+	CHECK(st_write == DRV_ERROR, "write to absent slave did not return DRV_ERROR");
+	CHECK(ms < 10U, "NACK not detected early: call waited for the timeout");
+	CHECK(test_wait_reg(&I2C1->SR2, 1U << I2C_SR2_BUSY, 0, TEST_TIMEOUT_MS), "bus not released after NACK");
+	CHECK(!(I2C1->SR1 & (1U << I2C_SR1_AF)), "AF flag left set after the failed write");
+
+	CHECK(I2C_MasterReceiveData(&i2c1, &rx, 1, ABSENT_ADDR, I2C_DISABLE_SR, TEST_TIMEOUT_MS) == DRV_ERROR,
+	      "read from absent slave did not return DRV_ERROR");
+	CHECK(I2C1->CR1 & (1U << I2C_CR1_ACK), "ACK not restored after the failed read");
+	CHECK(test_wait_reg(&I2C1->SR2, 1U << I2C_SR2_BUSY, 0, TEST_TIMEOUT_MS), "bus not released after failed read");
 
 	loop_teardown();
 }
@@ -411,6 +430,7 @@ void test_suite_i2c(void) {
 	test_run(test_loop_it_master_read,         "i2c_loop_it_master_read");
 	test_run(test_loop_it_nack_absent_slave,   "i2c_loop_it_nack_absent_slave");
 	test_run(test_loop_blocking_register_read, "i2c_loop_blocking_register_read");
+	test_run(test_loop_blocking_nack_absent_slave, "i2c_loop_blocking_nack_absent_slave");
 
 	I2C_DeInit(I2C1);
 	I2C_DeInit(I2C3);

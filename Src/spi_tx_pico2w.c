@@ -26,9 +26,9 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000; i++);
-}
+#define SPI_TIMEOUT_MS       10U    // a few bytes at 500 kHz take < 1 ms
+
+#define DEBOUNCE_MS          200U   // ignore contact bounce after a press
 
 static void SPI_GPIO_ConfigInit(void) {
 	GPIO_Handle_t gpioSPI;
@@ -102,20 +102,20 @@ int main(void) {
 	while(1) {
 		// 1. Wait for button press (assuming active-LOW button)
 		while (GPIO_ReadFromInputPin(GPIOC, 13) == 1);
-		delay(); // Simple debounce delay
+		SYSTICK_DelayMs(DEBOUNCE_MS); // Simple debounce delay
 
 		uint8_t message[] = "HELLO";
 		uint8_t dataLen = strlen((char *)message);
 
 		// 2. Send length and payload
-		SPI_SendData(SPI2, &dataLen, 1);
-		SPI_SendData(SPI2, message, dataLen);
+		SPI_SendData(SPI2, &dataLen, 1, SPI_TIMEOUT_MS);
+		SPI_SendData(SPI2, message, dataLen, SPI_TIMEOUT_MS);
 
 		// 3. Wait for transmission to physically finish completely
 		while ( SPI_IsBusy(SPI2) );
 
 		// 3. Wait for user to RELEASE the button before looping again
 		while (GPIO_ReadFromInputPin(GPIOC, 13) == 0);
-		delay();
+		SYSTICK_DelayMs(DEBOUNCE_MS);
 	}
 }

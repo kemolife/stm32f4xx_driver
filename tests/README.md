@@ -40,6 +40,35 @@ reports `SKIP` (not `FAIL`). Add wires to enable the loopback tests.
 Must stay free: PC8 (pull-up/down test reads it), PA5 (LD2 result LED),
 PA13/PA14 (SWD), PB3 (SWO).
 
+### Run from the command line (recommended)
+
+Board on USB, then:
+
+```sh
+make test                    # or: tests/run_target.sh
+TIMEOUT_S=120 make test      # longer limit for the whole run
+```
+
+The script builds `build/tests.elf`, flashes it with openocd, captures the
+printf output over SWO, waits until `g_test_summary.done` is set and prints:
+
+```
+----- test output (SWO) -----
+=== suite: rcc ===
+[RUN ] rcc_sysclk_after_reset
+[PASS] rcc_sysclk_after_reset
+...
+-----------------------------
+66 tests: 40 passed, 20 failed, 6 skipped (55 failed checks)   (example numbers)
+first failure: test_spi.c:190
+```
+
+Exit code: `0` all passed (skips allowed), `1` failures, `2` the run did not
+finish (it names the test that hangs), `3` build / flash / connection error.
+So it can run unattended, for example in CI on a machine with a board.
+
+If the SWO capture is not available, only the summary is printed.
+
 ### Build and run in CubeIDE
 
 Use a separate build configuration, so `Debug` (the apps) stays untouched:
@@ -75,7 +104,8 @@ Use a separate build configuration, so `Debug` (the apps) stays untouched:
 1. Write `static void test_xxx(void)` in the suite file. Start from a clean
    peripheral (DeInit + fresh handle).
 2. Read registers directly in `CHECK`, not through the driver under test.
-3. Wait only with `test_wait_count` / `test_wait_reg` (they time out).
+3. Wait only with `test_wait_count` / `test_wait_reg` (they time out), and
+   pass `TEST_TIMEOUT_MS` to blocking driver calls.
 4. Loopback test: call the suite's wire check first and `SKIP` without it.
 5. Register it in the suite's `test_suite_xxx()` list.
 

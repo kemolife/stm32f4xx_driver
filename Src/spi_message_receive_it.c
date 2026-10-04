@@ -26,6 +26,8 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
+#define SPI_TIMEOUT_MS  10U   // one byte at 500 kHz takes 16 us
+
 #define ATTN_PIN        6
 #define MAX_MSG_LEN     64
 
@@ -166,8 +168,8 @@ void SPI_ApplicationEventCallback(SPI_Handle_t *pSPIHandle, uint8_t AppEv) {
 static uint8_t SPI_ExchangeByte(uint8_t out) {
 	uint8_t in = 0;
 
-	SPI_SendData(SPI2, &out, 1);
-	SPI_ReceiveData(SPI2, &in, 1);
+	SPI_SendData(SPI2, &out, 1, SPI_TIMEOUT_MS);
+	SPI_ReceiveData(SPI2, &in, 1, SPI_TIMEOUT_MS);
 
 	return in;
 }

@@ -39,6 +39,8 @@
 #include <string.h>
 #include "stm32f446xx.h"
 
+#define UART_TIMEOUT_MS 10U   // echo is 1..3 bytes: < 0.3 ms at 115200
+
 #define LED_PIN         5     // LD2 on PA5
 #define RX_RING_SIZE    64    // power of two, so the index wraps with a mask
 #define LINE_MAX        32
@@ -160,7 +162,7 @@ static void send_it(const char *text) {
 	strncpy(tx_msg, text, sizeof(tx_msg) - 1U);
 	tx_msg[sizeof(tx_msg) - 1U] = '\0';
 
-	if (UART_SendDataIT(&uart2Handle, (uint8_t *)tx_msg, strlen(tx_msg)) != UART_READY) {
+	if (UART_SendDataIT(&uart2Handle, (uint8_t *)tx_msg, strlen(tx_msg)) != DRV_OK) {
 		tx_done = 1;   // rejected, do not block the next answer forever
 	}
 }
@@ -214,7 +216,7 @@ int main(void) {
 		if (ch == '\r' || ch == '\n') {
 			// Wait for any pending IT answer, then echo the newline blocking
 			while (!tx_done);
-			UART_SendData(&uart2Handle, (uint8_t *)"\r\n", 2);
+			UART_SendData(&uart2Handle, (uint8_t *)"\r\n", 2, UART_TIMEOUT_MS);
 
 			line[line_len] = '\0';
 			run_command(line);
@@ -225,11 +227,11 @@ int main(void) {
 			// Backspace: erase the char on the terminal too
 			line_len--;
 			while (!tx_done);
-			UART_SendData(&uart2Handle, (uint8_t *)"\b \b", 3);
+			UART_SendData(&uart2Handle, (uint8_t *)"\b \b", 3, UART_TIMEOUT_MS);
 		} else if (ch >= ' ' && line_len < LINE_MAX) {
 			line[line_len++] = (char)ch;
 			while (!tx_done);
-			UART_SendData(&uart2Handle, &ch, 1);   // echo
+			UART_SendData(&uart2Handle, &ch, 1, UART_TIMEOUT_MS);   // echo
 		}
 	}
 }

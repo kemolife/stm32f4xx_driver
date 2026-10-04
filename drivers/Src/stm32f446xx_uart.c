@@ -232,16 +232,21 @@ void UART_ClearFlag(UART_RegDef_t *pUARTx, uint32_t FlagName) {
  * @param[in]          - pointer to the UART Handle structure
  * @param[in]          - pointer to the transmit buffer
  * @param[in]          - number of frames to send
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  *
  * @Note               - blocking call. It returns only when the last frame has left the
  *                       shift register (TC = 1)
  *
  ******************************************************************************************/
-void UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len) {
-	/* 1. Loop Len times:
+DRV_Status_t UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len, uint32_t Timeout) {
+	/* 0. pTxBuffer == NULL or Len == 0 -> return DRV_ERROR.
+	 *    start = SYSTICK_GetTick()   (one timeout for the whole call)
+	 * 1. Loop Len times:
 	 * 2.   Wait until TXE = 1 (DR is free, previous byte moved to shift register).
+	 *      Inside the wait: if (SYSTICK_IsTimeout(start, Timeout)) return DRV_TIMEOUT;
+	 *      (see SPI_SendData for the same pattern)
 	 * 3.   If WordLength == 9 bits:
 	 *        - load 2 bytes: DR = (*(uint16_t *)pTxBuffer) & 0x01FF
 	 *        - no parity: 9 data bits, advance pTxBuffer by 2
@@ -250,13 +255,17 @@ void UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len)
 	 *        - DR = *pTxBuffer & 0xFF
 	 *        - parity on: only 7 data bits, hardware replaces bit 7
 	 *        - advance pTxBuffer by 1
-	 * 4. After the loop wait until TC = 1. Only then is the last frame fully out
-	 *    and it is safe to disable UE or switch the line direction. */
+	 * 4. After the loop wait until TC = 1 (same timeout check). Only then is the
+	 *    last frame fully out and it is safe to disable UE or switch the line
+	 *    direction.
+	 * 5. return DRV_OK */
 
 	/* TODO: implement */
 	(void)pUARTHandle;
 	(void)pTxBuffer;
 	(void)Len;
+	(void)Timeout;
+	return DRV_ERROR;
 }
 
 /******************************************************************************************
@@ -267,15 +276,18 @@ void UART_SendData(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len)
  * @param[in]          - pointer to the UART Handle structure
  * @param[in]          - pointer to the receive buffer
  * @param[in]          - number of frames to receive
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  *
- * @Note               - blocking call with no timeout. It hangs if no data arrives
+ * @Note               - blocking call. With DRV_MAX_DELAY it waits forever if no data comes
  *
  ******************************************************************************************/
-void UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len) {
-	/* 1. Loop Len times:
-	 * 2.   Wait until RXNE = 1.
+DRV_Status_t UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len, uint32_t Timeout) {
+	/* 0. pRxBuffer == NULL or Len == 0 -> return DRV_ERROR.
+	 *    start = SYSTICK_GetTick()
+	 * 1. Loop Len times:
+	 * 2.   Wait until RXNE = 1, with the SYSTICK_IsTimeout check -> DRV_TIMEOUT.
 	 * 3.   If WordLength == 9 bits:
 	 *        - no parity: *(uint16_t *)pRxBuffer = DR & 0x01FF, advance by 2
 	 *        - parity on: *pRxBuffer = DR & 0xFF, advance by 1
@@ -283,12 +295,15 @@ void UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t L
 	 *        - no parity: *pRxBuffer = DR & 0xFF
 	 *        - parity on: *pRxBuffer = DR & 0x7F (bit 7 is the parity bit)
 	 *        - advance by 1
-	 *    Reading DR clears RXNE. */
+	 *    Reading DR clears RXNE.
+	 * 4. return DRV_OK */
 
 	/* TODO: implement */
 	(void)pUARTHandle;
 	(void)pRxBuffer;
 	(void)Len;
+	(void)Timeout;
+	return DRV_ERROR;
 }
 
 /******************************************************************************************
@@ -300,26 +315,27 @@ void UART_ReceiveData(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t L
  * @param[in]          - pointer to the transmit buffer
  * @param[in]          - number of frames to send
  *
- * @return             - the TX state before the call. UART_READY means the transfer was
- *                       accepted, UART_BUSY_IN_TX means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a transmission is still running
+ *                       (nothing changed), DRV_ERROR for a bad argument
  *
  * @Note               - the buffer must stay valid until the UART_EVENT_TX_CMPLT callback
  *
  ******************************************************************************************/
-uint8_t UART_SendDataIT(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len) {
-	/* 1. txstate = pUARTHandle->TxBusyState
-	 * 2. If txstate != UART_BUSY_IN_TX:
+DRV_Status_t UART_SendDataIT(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t Len) {
+	/* 1. pTxBuffer == NULL or Len == 0 -> return DRV_ERROR
+	 * 2. TxBusyState == UART_BUSY_IN_TX -> return DRV_BUSY
+	 * 3. Start:
 	 *      a. save pTxBuffer and Len in the handle
 	 *      b. TxBusyState = UART_BUSY_IN_TX
 	 *      c. set TXEIE  -> the ISR is entered at once, because TXE is already 1
 	 *      d. set TCIE   -> used to know when the last frame has left the wire
-	 * 3. return txstate */
+	 * 4. return DRV_OK  (see SPI_SendDataIT for the same pattern) */
 
 	/* TODO: implement */
 	(void)pUARTHandle;
 	(void)pTxBuffer;
 	(void)Len;
-	return UART_READY;
+	return DRV_ERROR;
 }
 
 /******************************************************************************************
@@ -331,26 +347,27 @@ uint8_t UART_SendDataIT(UART_Handle_t *pUARTHandle, uint8_t *pTxBuffer, uint32_t
  * @param[in]          - pointer to the receive buffer
  * @param[in]          - number of frames to receive
  *
- * @return             - the RX state before the call. UART_READY means the transfer was
- *                       accepted, UART_BUSY_IN_RX means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a reception is still running
+ *                       (nothing changed), DRV_ERROR for a bad argument
  *
  * @Note               - the buffer must stay valid until the UART_EVENT_RX_CMPLT callback
  *
  ******************************************************************************************/
-uint8_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len) {
-	/* 1. rxstate = pUARTHandle->RxBusyState
-	 * 2. If rxstate != UART_BUSY_IN_RX:
+DRV_Status_t UART_ReceiveDataIT(UART_Handle_t *pUARTHandle, uint8_t *pRxBuffer, uint32_t Len) {
+	/* 1. pRxBuffer == NULL or Len == 0 -> return DRV_ERROR
+	 * 2. RxBusyState == UART_BUSY_IN_RX -> return DRV_BUSY
+	 * 3. Start:
 	 *      a. save pRxBuffer and Len in the handle
 	 *      b. RxBusyState = UART_BUSY_IN_RX
 	 *      c. set RXNEIE (this also enables the ORE interrupt)
 	 *      d. optional: set CR3 EIE for FE/NF, and CR1 PEIE if parity is on
-	 * 3. return rxstate */
+	 * 4. return DRV_OK */
 
 	/* TODO: implement */
 	(void)pUARTHandle;
 	(void)pRxBuffer;
 	(void)Len;
-	return UART_READY;
+	return DRV_ERROR;
 }
 
 /******************************************************************************************

@@ -9,9 +9,7 @@
 
 #include "stm32f446xx.h"
 
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000; i++);
-}
+#define BLINK_HALF_PERIOD_MS 250U   // LED on 250 ms, off 250 ms
 
 int main(void) {
 	GPIO_Handle_t gpioLed;
@@ -28,7 +26,7 @@ int main(void) {
 
 	while (1) {
 		GPIO_ToggleOutputPin(GPIOA, 6);
-		delay();
+		SYSTICK_DelayMs(BLINK_HALF_PERIOD_MS);
 	}
 
 	return 0;

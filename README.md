@@ -38,7 +38,18 @@ tests/        on-target driver tests (not part of the normal build)
 
 ## Quick start
 
-1. Open the project in STM32CubeIDE.
+**Command line** (needs `arm-none-eabi-gcc`, `make`, `openocd`):
+
+```sh
+make APP=gpio_led          # build one example -> build/gpio_led.elf
+make flash APP=gpio_led    # build and flash it over the ST-LINK
+make apps                  # build every example
+make test                  # build, flash and run the driver tests
+```
+
+**STM32CubeIDE:**
+
+1. Open the project.
 2. Pick **one** example in `Src/`. Every other file with a `main()` must be
    excluded from the build: right click > Resource Configurations > Exclude
    from Build. `syscalls.c` and `sysmem.c` always stay in.
@@ -105,11 +116,22 @@ spi.Config.CPOL       = SPI_CPOL_LOW;
 spi.Config.CPHA       = SPI_CPHA_LOW;
 spi.Config.SSM        = SPI_SSM_EN;
 
-SPI_PeriClockControl(SPI2, DRV_ENABLE);    // 1. clock on
-SPI_Init(&spi);                        // 2. configure (peripheral still off)
-SPI_PeripheralControl(SPI2, DRV_ENABLE);   // 3. switch on
-SPI_SendData(SPI2, data, len);         // 4. use
+SPI_PeriClockControl(SPI2, DRV_ENABLE);     // 1. clock on
+SPI_Init(&spi);                             // 2. configure (peripheral still off)
+SPI_PeripheralControl(SPI2, DRV_ENABLE);    // 3. switch on
+
+if (SPI_SendData(SPI2, data, len, 10) != DRV_OK) {   // 4. use, 10 ms timeout
+    /* DRV_TIMEOUT: hardware did not answer, DRV_ERROR: bad argument */
+}
 ```
+
+**Results:** every blocking transfer takes a `Timeout` in ms
+(`DRV_MAX_DELAY` = wait forever) and returns `DRV_Status_t`: `DRV_OK`,
+`DRV_ERROR`, `DRV_BUSY` or `DRV_TIMEOUT`. Interrupt transfers
+(`XXX_SendDataIT`) return `DRV_OK` when started and `DRV_BUSY` when one is
+still running. Timeouts use the SysTick ms counter, which starts by itself on
+first use. Do not call blocking functions from an interrupt handler: SysTick
+has the lowest priority, so the timeout could never expire.
 
 The pins are configured separately with the GPIO driver (alternate function
 mode and AF number from the datasheet).
@@ -127,6 +149,8 @@ events.
 - **Handles:** `Instance` is the register base, `Config` holds the settings.
 - **On/off arguments:** type `DRV_State_t`, values `DRV_ENABLE` / `DRV_DISABLE`
   (prefixed, so they cannot clash with other libraries).
+- **Results:** transfers return `DRV_Status_t`. No function waits forever
+  unless the caller passes `DRV_MAX_DELAY`.
 - **Register bits:** use the bit position macros (`SPI_CR1_SPE`), never a raw
   number.
 - **Comments:** every public function has a doc block. Comments explain *why*
@@ -150,12 +174,15 @@ events.
 `tests/target/` holds one firmware image that tests every driver on the
 board: real registers, real pins, real interrupts. Register tests need no
 wiring; loopback tests need a few jumper wires and are skipped without them.
+
+```sh
+make test        # exit code 0 = all passed, 1 = failures, 2 = hang, 3 = tool error
+```
+
 See [tests/README.md](tests/README.md).
 
 ## Known limitations
 
-- Blocking functions wait without a timeout. If the hardware does not answer
-  (missing slave, wrong wiring) they never return.
 - RCC configures the main PLL only: no PLLI2S / PLLSAI, no USB 48 MHz setup,
   no LSE / RTC clock.
 - Flash wait states assume a 2.7..3.6 V supply (true on the NUCLEO board).

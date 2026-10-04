@@ -574,6 +574,19 @@ typedef enum {
     DRV_ENABLE  = 1
 } DRV_State_t;
 
+/**
+ * Result of every blocking transfer and of every interrupt transfer start
+ */
+typedef enum {
+    DRV_OK      = 0,   /* done (blocking) or accepted (interrupt start)            */
+    DRV_ERROR   = 1,   /* bad argument, or the other side refused (I2C NACK)       */
+    DRV_BUSY    = 2,   /* an interrupt transfer is still running on this handle    */
+    DRV_TIMEOUT = 3    /* the hardware did not answer within the Timeout           */
+} DRV_Status_t;
+
+/* Timeout value that means "wait forever" */
+#define DRV_MAX_DELAY      0xFFFFFFFFU
+
 #define IRQ_NO_EXTI0      6
 #define IRQ_NO_EXTI1      7
 #define IRQ_NO_EXTI2      8

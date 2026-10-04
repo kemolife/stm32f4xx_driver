@@ -6,14 +6,20 @@
  *
  * Interrupt: a falling edge on PC5 (button, active low) fires EXTI9_5,
  * and the ISR toggles the LED on PA6.
+ *
+ * Debounce without blocking: a mechanical button gives several edges per
+ * press. The ISR ignores every edge that comes less than DEBOUNCE_MS after
+ * the last accepted one. Waiting inside the ISR is not possible:
+ * SYSTICK_DelayMs needs the SysTick interrupt, which cannot run while this
+ * handler (same lowest priority) is active.
  */
 
 #include <string.h>
 #include "stm32f446xx.h"
 
-static void delay(void) {
-	for (volatile uint32_t i = 0; i < 500000/2; i++);
-}
+#define DEBOUNCE_MS          200U   // ignore contact bounce after a press
+
+static uint32_t last_press_ms;
 
 int main(void) {
 	GPIO_Handle_t gpioLed, gpioButton;
@@ -41,6 +47,8 @@ int main(void) {
 	GPIO_PeriClockControl(GPIOC, DRV_ENABLE);
 	GPIO_Init(&gpioButton);
 
+	SYSTICK_Init();   // the debounce reads the ms tick
+
 	GPIO_IRQPriorityConfig(IRQ_NO_EXTI9_5, NVIC_IRQ_PRI15);
 	GPIO_IRQInterruptConfig(IRQ_NO_EXTI9_5, DRV_ENABLE);
 
@@ -48,7 +56,11 @@ int main(void) {
 }
 
 void EXTI9_5_IRQHandler(void) {
-	delay();
-	GPIO_IRQHandling(5);
-	GPIO_ToggleOutputPin(GPIOA, 6);
+	GPIO_IRQHandling(5);   // always clear the pending bit, also for ignored edges
+
+	uint32_t now = SYSTICK_GetTick();
+	if ((now - last_press_ms) >= DEBOUNCE_MS) {
+		last_press_ms = now;
+		GPIO_ToggleOutputPin(GPIOA, 6);
+	}
 }

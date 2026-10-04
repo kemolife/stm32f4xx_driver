@@ -183,29 +183,38 @@ void SPI_DeInit(SPI_RegDef_t *pSPIx) {
  * @param[in]          - base address of the SPI peripheral
  * @param[in]          - pointer to the transmit buffer
  * @param[in]          - number of bytes to send (must be even in 16-bit mode)
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  *
  * @Note               - blocking call. It returns when the last byte is in the transmit
  *                       buffer, not when it has left the wire: check SPI_IsBusy() before
  *                       disabling the peripheral. Received bytes are not read here, so in
- *                       full duplex read them (SPI_ReceiveData) or OVR will be set
+ *                       full duplex read them (SPI_ReceiveData) or OVR will be set.
+ *                       TXE never comes back while SPE is 0, so a forgotten
+ *                       SPI_PeripheralControl(..., DRV_ENABLE) ends in DRV_TIMEOUT
  *
  ******************************************************************************************/
-void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
+DRV_Status_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len, uint32_t Timeout) {
 	if (Len == 0 || pTxBuffer == NULL) {
-		return;
+		return DRV_ERROR;
 	}
 
 	uint8_t dff_bit = (pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	// Safety check: 16-bit mode requires an even number of bytes
 	if (dff_bit == SPI_DFF_16BITS && (Len % 2 != 0)) {
-		return;
+		return DRV_ERROR;
 	}
 
+	uint32_t start = SYSTICK_GetTick();
+
 	while(Len > 0) {
-		while (!(pSPIx->SR & (1 << SPI_SR_TXE)));
+		while (!(pSPIx->SR & (1U << SPI_SR_TXE))) {
+			if (SYSTICK_IsTimeout(start, Timeout)) {
+				return DRV_TIMEOUT;
+			}
+		}
 
 		if (dff_bit == SPI_DFF_8BITS) {
 			*((volatile uint8_t*)&pSPIx->DR) = *pTxBuffer;
@@ -217,6 +226,8 @@ void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
 			Len -= 2;
 		}
 	}
+
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -227,27 +238,35 @@ void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
  * @param[in]          - base address of the SPI peripheral
  * @param[in]          - pointer to the receive buffer
  * @param[in]          - number of bytes to receive (must be even in 16-bit mode)
+ * @param[in]          - maximum time for the whole call in ms, DRV_MAX_DELAY = forever
  *
- * @return             - none
+ * @return             - DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  *
  * @Note               - blocking call. A master only receives while it clocks, so in
- *                       master mode send one dummy byte per byte you want to receive
+ *                       master mode send one dummy byte per byte you want to receive.
+ *                       A slave whose master never clocks ends in DRV_TIMEOUT
  *
  ******************************************************************************************/
-void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
+DRV_Status_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len, uint32_t Timeout) {
 	if (Len == 0 || pRxBuffer == NULL) {
-		return;
+		return DRV_ERROR;
 	}
 
 	uint8_t dff_bit = (pSPIx->CR1 >> SPI_CR1_DFF) & 0x01;
 
 	// Safety check: 16-bit mode requires an even number of bytes
 	if (dff_bit == SPI_DFF_16BITS && (Len % 2 != 0)) {
-		return;
+		return DRV_ERROR;
 	}
 
+	uint32_t start = SYSTICK_GetTick();
+
 	while(Len > 0) {
-		while (!(pSPIx->SR & (1 << SPI_SR_RXNE)));
+		while (!(pSPIx->SR & (1U << SPI_SR_RXNE))) {
+			if (SYSTICK_IsTimeout(start, Timeout)) {
+				return DRV_TIMEOUT;
+			}
+		}
 
 		if (dff_bit == SPI_DFF_8BITS) {
 			*pRxBuffer = *((volatile uint8_t*)&pSPIx->DR);
@@ -259,6 +278,8 @@ void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
 			Len -= 2;
 		}
 	}
+
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -343,25 +364,28 @@ void SPI_IRQHandling(SPI_Handle_t *pSPIHandle)
  * @param[in]          - pointer to the transmit buffer
  * @param[in]          - number of bytes to send
  *
- * @return             - the TX state before the call. SPI_READY means the transfer was
- *                       accepted, SPI_BUSY_IN_TX means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a transmission is still
+ *                       running (nothing changed), DRV_ERROR for a bad argument
  *
  * @Note               - the buffer must stay valid until the SPI_EVENT_TX_CMPLT callback
  *
  ******************************************************************************************/
-uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len) {
-	uint8_t state = pSPIHandle->TxState;
-
-	if (state == SPI_BUSY_IN_TX){ return state; }
+DRV_Status_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len) {
+	if (pTxBuffer == NULL || Len == 0) {
+		return DRV_ERROR;
+	}
+	if (pSPIHandle->TxState == SPI_BUSY_IN_TX) {
+		return DRV_BUSY;
+	}
 
 	pSPIHandle->pTxBuffer = pTxBuffer;
 	pSPIHandle->TxLen = Len;
 
 	pSPIHandle->TxState = SPI_BUSY_IN_TX;
 
-	pSPIHandle->Instance->CR2 |= 1 << SPI_CR2_TXEIE;
+	pSPIHandle->Instance->CR2 |= (1U << SPI_CR2_TXEIE);
 
-	return state;
+	return DRV_OK;
 }
 
 /******************************************************************************************
@@ -373,26 +397,29 @@ uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Le
  * @param[in]          - pointer to the receive buffer
  * @param[in]          - number of bytes to receive
  *
- * @return             - the RX state before the call. SPI_READY means the transfer was
- *                       accepted, SPI_BUSY_IN_RX means it was rejected
+ * @return             - DRV_OK when started, DRV_BUSY when a reception is still
+ *                       running (nothing changed), DRV_ERROR for a bad argument
  *
  * @Note               - the buffer must stay valid until the SPI_EVENT_RX_CMPLT callback.
  *                       A master must also send (SPI_SendDataIT) to generate the clock
  *
  ******************************************************************************************/
-uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len) {
-	uint8_t state = pSPIHandle->RxState;
-
-	if (state == SPI_BUSY_IN_RX){ return state; }
+DRV_Status_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len) {
+	if (pRxBuffer == NULL || Len == 0) {
+		return DRV_ERROR;
+	}
+	if (pSPIHandle->RxState == SPI_BUSY_IN_RX) {
+		return DRV_BUSY;
+	}
 
 	pSPIHandle->pRxBuffer = pRxBuffer;
 	pSPIHandle->RxLen = Len;
 
 	pSPIHandle->RxState = SPI_BUSY_IN_RX;
 
-	pSPIHandle->Instance->CR2 |= 1 << SPI_CR2_RXNEIE;
+	pSPIHandle->Instance->CR2 |= (1U << SPI_CR2_RXNEIE);
 
-	return state;
+	return DRV_OK;
 }
 
 static void spi_tx_interrupt_handle(SPI_Handle_t *pSPIHandle) {

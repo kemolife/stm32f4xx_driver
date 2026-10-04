@@ -151,17 +151,21 @@ void SPI_DeInit(SPI_RegDef_t *pSPIx);
  * @brief  Transmits data over the SPI bus (Blocking/Polling method)
  * @param  pSPIx: Base address of the SPI peripheral
  * @param  pTxBuffer: Pointer to the data byte buffer to be transmitted
- * @param  Len: Length of data bytes to send
+ * @param  Len: Length of data bytes to send (even in 16-bit mode)
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  */
-void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len);
+DRV_Status_t SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len, uint32_t Timeout);
 
 /**
  * @brief  Receives data over the SPI bus (Blocking/Polling method)
  * @param  pSPIx: Base address of the SPI peripheral
  * @param  pRxBuffer: Pointer to memory buffer where received data will be stored
- * @param  Len: Length of data bytes to receive
+ * @param  Len: Length of data bytes to receive (even in 16-bit mode)
+ * @param  Timeout: Maximum time for the whole call in ms, DRV_MAX_DELAY = forever
+ * @return DRV_OK, DRV_ERROR (bad argument) or DRV_TIMEOUT
  */
-void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len);
+DRV_Status_t SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len, uint32_t Timeout);
 
 /**
  * @brief  Configures the NVIC interrupt controller settings for SPI interrupts
@@ -199,15 +203,15 @@ int SPI_IsBusy(SPI_RegDef_t *pSPIx);
 
 /**
  * @brief  Starts an interrupt driven transmission
- * @return State before the call. SPI_READY means the transfer was accepted
+ * @return DRV_OK (started), DRV_BUSY (a transmission is running) or DRV_ERROR
  */
-uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len);
+DRV_Status_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTxBuffer, uint32_t Len);
 
 /**
  * @brief  Starts an interrupt driven reception
- * @return State before the call. SPI_READY means the transfer was accepted
+ * @return DRV_OK (started), DRV_BUSY (a reception is running) or DRV_ERROR
  */
-uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len);
+DRV_Status_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRxBuffer, uint32_t Len);
 
 /**
  * @brief  Application-level notification of SPI events. Declared weak in the

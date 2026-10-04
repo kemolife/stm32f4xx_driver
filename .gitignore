@@ -5,6 +5,8 @@
 # including the makefiles. Nothing in there is source.
 Debug/
 Release/
+# Makefile output
+build/
 
 # Loose artifacts if you ever build outside the IDE
 *.o
